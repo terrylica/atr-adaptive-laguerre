@@ -37,6 +37,9 @@ from atr_adaptive_laguerre.core.laguerre_filter import (
 from atr_adaptive_laguerre.core.laguerre_rsi import calculate_laguerre_rsi
 from atr_adaptive_laguerre.core.true_range import TrueRangeState
 from atr_adaptive_laguerre.features.base import BaseFeature, FeatureConfig
+from atr_adaptive_laguerre.features.cross_interval import CrossIntervalFeatures
+from atr_adaptive_laguerre.features.feature_expander import FeatureExpander
+from atr_adaptive_laguerre.features.multi_interval import MultiIntervalProcessor
 
 
 class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
@@ -68,6 +71,18 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         default=0.75, ge=0.0, description="Adaptive period offset"
     )
 
+    # Multi-interval feature extraction params
+    multiplier_1: int | None = Field(
+        default=None,
+        ge=2,
+        description="First higher interval multiplier (e.g., 3 for 3× base)",
+    )
+    multiplier_2: int | None = Field(
+        default=None,
+        ge=2,
+        description="Second higher interval multiplier (e.g., 12 for 12× base)",
+    )
+
     @field_validator("level_down")
     @classmethod
     def validate_level_down_lt_level_up(cls, v: float, info) -> float:
@@ -76,6 +91,18 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             raise ValueError(
                 f"level_down ({v}) must be < level_up ({info.data['level_up']})"
             )
+        return v
+
+    @field_validator("multiplier_2")
+    @classmethod
+    def validate_multiplier_order(cls, v: int | None, info) -> int | None:
+        """Validate multiplier_1 < multiplier_2 if both provided."""
+        if v is not None and "multiplier_1" in info.data and info.data["multiplier_1"] is not None:
+            if info.data["multiplier_1"] >= v:
+                raise ValueError(
+                    f"multiplier_1 ({info.data['multiplier_1']}) must be < "
+                    f"multiplier_2 ({v})"
+                )
         return v
 
 
@@ -299,3 +326,105 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # All tests passed → feature is non-anticipative
         return True
+
+    def fit_transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform OHLCV to full feature matrix (27 or 121 columns).
+
+        Returns 27 single-interval features if multipliers not provided,
+        or 121 features (27 × 3 intervals + 40 cross-interval) if multipliers provided.
+
+        Args:
+            df: OHLCV DataFrame at base interval
+                Must have columns: date, open, high, low, close, volume
+                Must be sorted chronologically
+
+        Returns:
+            DataFrame with features:
+            - If multipliers=None: 27 columns (single-interval)
+            - If multipliers provided: 121 columns (multi-interval + interactions)
+
+            Index: Same as input df
+            Columns (121-feature case):
+            - {feature}_base (27 columns)
+            - {feature}_mult1 (27 columns, forward-filled to base)
+            - {feature}_mult2 (27 columns, forward-filled to base)
+            - Cross-interval interactions (40 columns)
+
+        Raises:
+            ValueError: If df invalid (propagated from fit_transform)
+            ValueError: If multipliers provided but invalid
+            ValueError: If multiplier_1 and multiplier_2 not both set or both None
+
+        Non-anticipative guarantee: All 121 features pass progressive subset test.
+
+        Example (single-interval):
+            >>> config = ATRAdaptiveLaguerreRSIConfig()
+            >>> feature = ATRAdaptiveLaguerreRSI(config)
+            >>> df_5m = fetcher.fetch("BTCUSDT", "5m", start, end)
+            >>> features = feature.fit_transform_features(df_5m)
+            >>> features.shape  # (n_bars, 27)
+
+        Example (multi-interval):
+            >>> config = ATRAdaptiveLaguerreRSIConfig(
+            ...     multiplier_1=3,   # 15m features
+            ...     multiplier_2=12   # 1h features
+            ... )
+            >>> feature = ATRAdaptiveLaguerreRSI(config)
+            >>> df_5m = fetcher.fetch("BTCUSDT", "5m", start, end)
+            >>> features = feature.fit_transform_features(df_5m)
+            >>> features.shape  # (n_bars, 121)
+        """
+        # Validate multiplier configuration
+        mult1 = self.config.multiplier_1
+        mult2 = self.config.multiplier_2
+
+        if (mult1 is None) != (mult2 is None):
+            raise ValueError(
+                "multiplier_1 and multiplier_2 must both be set or both be None. "
+                f"Got multiplier_1={mult1}, multiplier_2={mult2}"
+            )
+
+        # Compute base RSI
+        rsi_base = self.fit_transform(df)
+
+        # Expand to 27 single-interval features
+        expander = FeatureExpander(
+            level_up=self.config.level_up,
+            level_down=self.config.level_down,
+            stats_window=20,  # Fixed for now
+            velocity_span=5,  # Fixed for now
+        )
+        features_base = expander.expand(rsi_base)
+
+        # If no multipliers, return 27 features
+        if mult1 is None:
+            return features_base
+
+        # Multi-interval mode: Extract features for all 3 intervals
+        processor = MultiIntervalProcessor(multiplier_1=mult1, multiplier_2=mult2)
+
+        # Resample and extract features (returns 81 columns: 27 × 3)
+        features_all_intervals = processor.resample_and_extract(
+            df, lambda ohlcv: expander.expand(self.fit_transform(ohlcv))
+        )
+
+        # Extract cross-interval interactions (40 columns)
+        cross_interval = CrossIntervalFeatures()
+        features_base_cols = features_all_intervals[[c for c in features_all_intervals.columns if c.endswith("_base")]]
+        features_mult1_cols = features_all_intervals[[c for c in features_all_intervals.columns if c.endswith("_mult1")]]
+        features_mult2_cols = features_all_intervals[[c for c in features_all_intervals.columns if c.endswith("_mult2")]]
+
+        # Remove suffixes for interaction extraction
+        features_base_cols.columns = features_base_cols.columns.str.replace("_base", "")
+        features_mult1_cols.columns = features_mult1_cols.columns.str.replace("_mult1", "")
+        features_mult2_cols.columns = features_mult2_cols.columns.str.replace("_mult2", "")
+
+        interactions = cross_interval.extract_interactions(
+            features_base_cols, features_mult1_cols, features_mult2_cols
+        )
+
+        # Combine all features: 81 interval features + 40 interactions = 121
+        features_final = pd.concat([features_all_intervals, interactions], axis=1)
+
+        return features_final

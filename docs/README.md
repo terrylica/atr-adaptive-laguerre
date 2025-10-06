@@ -28,7 +28,7 @@ uv add atr-adaptive-laguerre
 ## Quick Start
 
 ```python
-from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRConfig
+from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRAdaptiveLaguerreRSIConfig
 from atr_adaptive_laguerre.data import BinanceAdapter
 
 # Fetch data
@@ -36,7 +36,7 @@ adapter = BinanceAdapter()
 df = adapter.fetch("BTCUSDT", "1h", "2024-01-01", "2024-06-30")
 
 # Create feature
-config = ATRConfig(atr_period=32, smoothing_period=5)
+config = ATRAdaptiveLaguerreRSIConfig(atr_period=32, smoothing_period=5)
 feature = ATRAdaptiveLaguerreRSI(config)
 
 # Transform (non-anticipative)
@@ -45,10 +45,9 @@ rsi_series = feature.fit_transform(df)
 
 ## Documentation
 
-- [Algorithm Details](algorithm.md) - MQL5 → Python implementation mapping
-- [API Reference](api.md) - Complete API documentation
-- [Validation Methodology](validation.md) - Quality proxies and testing
-- [Seq2Seq Integration](seq2seq_integration.md) - Downstream usage guide
+- [API Reference](https://github.com/eonlabs/atr-adaptive-laguerre/blob/main/docs/API_REFERENCE.md) - Complete API documentation
+- [Examples](https://github.com/eonlabs/atr-adaptive-laguerre/tree/main/examples) - Runnable usage examples
+- [Changelog](https://github.com/eonlabs/atr-adaptive-laguerre/blob/main/CHANGELOG.md) - Release notes and version history
 
 ## License
 

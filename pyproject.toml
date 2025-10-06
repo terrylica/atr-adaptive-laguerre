@@ -4,17 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atr-adaptive-laguerre"
-version = "0.1.0"
+version = "0.1.1"
 description = "ATR-adaptive Laguerre RSI for non-anticipative feature engineering in seq-2-seq forecasting"
 readme = "docs/README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "Eon Labs Ltd."}]
 keywords = ["trading", "features", "seq2seq", "volatility", "rsi", "laguerre", "atr"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
@@ -48,7 +51,7 @@ packages = ["src/atr_adaptive_laguerre"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
 
@@ -56,7 +59,7 @@ ignore = ["E501"]
 "__init__.py" = ["F401"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

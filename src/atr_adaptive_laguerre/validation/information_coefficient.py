@@ -105,18 +105,20 @@ def calculate_information_coefficient(
     # Calculate forward returns
     if return_type == "simple":
         # Simple return: (p[t+k] - p[t]) / p[t]
-        forward_returns = prices.pct_change(periods=forward_periods)
+        # Use shift(-k) to get future prices: prices[t+k] / prices[t] - 1
+        forward_returns = prices.shift(-forward_periods) / prices - 1
     else:
         # Log return: log(p[t+k] / p[t])
-        forward_returns = np.log(prices / prices.shift(forward_periods))
+        # Use shift(-k) to get future prices: log(prices[t+k] / prices[t])
+        forward_returns = np.log(prices.shift(-forward_periods) / prices)
 
     # Align feature[t] with forward_return[t]
     # Feature at time t should predict return from t to t+k
-    # So we use feature[t] and forward_return[t] (which is return from t to t+k)
+    # forward_returns[t] now contains return from t to t+k (future return)
     aligned_feature = feature.values
     aligned_returns = forward_returns.values
 
-    # Drop NaN values (first k bars will have NaN returns)
+    # Drop NaN values (last k bars will have NaN returns due to forward shift)
     # scipy will handle this with nan_policy='omit', but let's be explicit
     valid_mask = ~(np.isnan(aligned_feature) | np.isnan(aligned_returns))
     valid_feature = aligned_feature[valid_mask]
