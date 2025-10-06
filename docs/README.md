@@ -45,9 +45,9 @@ rsi_series = feature.fit_transform(df)
 
 ## Documentation
 
-- [API Reference](https://github.com/eonlabs/atr-adaptive-laguerre/blob/main/docs/API_REFERENCE.md) - Complete API documentation
-- [Examples](https://github.com/eonlabs/atr-adaptive-laguerre/tree/main/examples) - Runnable usage examples
-- [Changelog](https://github.com/eonlabs/atr-adaptive-laguerre/blob/main/CHANGELOG.md) - Release notes and version history
+- [API Reference](https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/main/docs/API_REFERENCE.md) - Complete API documentation
+- [Examples](https://github.com/Eon-Labs/atr-adaptive-laguerre/tree/main/examples) - Runnable usage examples
+- [Changelog](https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/main/CHANGELOG.md) - Release notes and version history
 
 ## License
 
