@@ -26,6 +26,14 @@ from atr_adaptive_laguerre.features import (  # noqa: F401
     FeatureConfig,
 )
 
+# Validation framework
+from atr_adaptive_laguerre.validation import (  # noqa: F401
+    calculate_information_coefficient,
+    validate_information_coefficient,
+    validate_non_anticipative,
+    validate_ood_robustness,
+)
+
 __all__ = [
     # Core
     "ATRState",
@@ -40,4 +48,9 @@ __all__ = [
     "ATRAdaptiveLaguerreRSIConfig",
     "BaseFeature",
     "FeatureConfig",
+    # Validation
+    "validate_non_anticipative",
+    "calculate_information_coefficient",
+    "validate_information_coefficient",
+    "validate_ood_robustness",
 ]

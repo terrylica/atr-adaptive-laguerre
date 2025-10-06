@@ -318,7 +318,7 @@ paths:
                       name:
                         enum: ["Validation Framework"]
                       status:
-                        enum: ["pending"]
+                        enum: ["completed"]
                       success_gate:
                         type: object
                         properties:
@@ -347,7 +347,7 @@ paths:
                                 - "src/atr_adaptive_laguerre/validation/information_coefficient.py"
                                 - "src/atr_adaptive_laguerre/validation/ood_robustness.py"
                             status:
-                              enum: ["pending"]
+                              enum: ["implemented"]
 
   /error-handling-policy:
     get:
