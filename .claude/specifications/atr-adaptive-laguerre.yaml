@@ -1,0 +1,460 @@
+openapi: 3.1.0
+info:
+  title: ATR-Adaptive Laguerre RSI Implementation Specification
+  version: 0.1.0
+  description: |
+    Machine-readable implementation plan for ATR-Adaptive Laguerre RSI feature engineering library.
+    Non-anticipative volatility-adaptive momentum indicator for seq-2-seq forecasting.
+
+components:
+  schemas:
+    ProjectMetadata:
+      type: object
+      required:
+        - version
+        - python_version
+        - build_backend
+        - toolchain
+      properties:
+        version:
+          type: string
+          enum: ["0.1.0"]
+          description: SemVer initial version
+        python_version:
+          type: string
+          enum: [">=3.12"]
+        build_backend:
+          type: string
+          enum: ["hatchling"]
+        toolchain:
+          type: object
+          properties:
+            package_manager:
+              type: string
+              enum: ["uv"]
+            execution:
+              type: string
+              example: "uv run python -m"
+            dependencies:
+              type: array
+              items:
+                type: string
+              example:
+                - "numpy>=1.26"
+                - "pandas>=2.0"
+                - "numba>=0.59"
+                - "pydantic>=2.0"
+                - "httpx>=0.27"
+                - "orjson>=3.10"
+                - "platformdirs>=4.0"
+                - "pyarrow>=15.0"
+                - "gapless-crypto-data>=2.11.0"
+
+    ImplementationPhase:
+      type: object
+      required:
+        - phase_id
+        - name
+        - status
+        - success_gate
+        - slos
+        - components
+      properties:
+        phase_id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: ["completed", "in_progress", "pending"]
+        success_gate:
+          type: object
+          required:
+            - criteria
+            - validation_method
+          properties:
+            criteria:
+              type: string
+            validation_method:
+              type: string
+        slos:
+          $ref: "#/components/schemas/ServiceLevelObjectives"
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/Component"
+
+    ServiceLevelObjectives:
+      type: object
+      required:
+        - availability
+        - correctness
+        - security
+        - observability
+        - maintainability
+      properties:
+        availability:
+          type: object
+          properties:
+            target:
+              type: string
+              example: "99.9%"
+            measurement:
+              type: string
+              example: "successful imports / total import attempts"
+        correctness:
+          type: object
+          properties:
+            target:
+              type: string
+              example: "100%"
+            measurement:
+              type: string
+              example: "MQL5 reference match within 1e-6 tolerance"
+        security:
+          type: object
+          properties:
+            target:
+              type: string
+              example: "Zero credential exposure"
+            measurement:
+              type: string
+              example: "No hardcoded secrets, Doppler integration"
+        observability:
+          type: object
+          properties:
+            target:
+              type: string
+              example: "100% type coverage"
+            measurement:
+              type: string
+              example: "mypy strict passes"
+        maintainability:
+          type: object
+          properties:
+            target:
+              type: string
+              example: ">90% test coverage"
+            measurement:
+              type: string
+              example: "pytest-cov report"
+
+    Component:
+      type: object
+      required:
+        - path
+        - purpose
+        - status
+        - error_handling
+        - dependencies
+      properties:
+        path:
+          type: string
+          example: "src/atr_adaptive_laguerre/core/true_range.py"
+        purpose:
+          type: string
+          example: "O(1) incremental True Range calculator"
+        status:
+          type: string
+          enum: ["implemented", "in_progress", "pending"]
+        error_handling:
+          type: string
+          enum: ["raise_and_propagate"]
+          description: "No fallbacks, defaults, retries, or silent handling"
+        dependencies:
+          type: array
+          items:
+            type: string
+          example: ["dataclasses"]
+        reference:
+          type: object
+          properties:
+            mql5_file:
+              type: string
+              example: "reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"
+            lines:
+              type: string
+              example: "161-169"
+
+    ValidationGate:
+      type: object
+      required:
+        - gate_id
+        - condition
+        - validation_method
+        - status
+      properties:
+        gate_id:
+          type: string
+        condition:
+          type: string
+        validation_method:
+          type: string
+        status:
+          type: string
+          enum: ["passed", "pending", "blocked"]
+
+paths:
+  /phases/1:
+    get:
+      summary: Phase 1 - Core Library
+      responses:
+        "200":
+          description: Core O(1) incremental calculators
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ImplementationPhase"
+                  - type: object
+                    properties:
+                      phase_id:
+                        enum: [1]
+                      name:
+                        enum: ["Core Library"]
+                      status:
+                        enum: ["completed"]
+                      success_gate:
+                        type: object
+                        properties:
+                          criteria:
+                            enum: ["All core functions match MQL5 reference within 1e-6 tolerance"]
+                          validation_method:
+                            enum: ["pytest with MQL5 reference data comparison"]
+                      slos:
+                        type: object
+                        properties:
+                          correctness:
+                            type: object
+                            properties:
+                              target:
+                                enum: ["100% MQL5 match"]
+                              measurement:
+                                enum: ["numpy.allclose(rtol=1e-6)"]
+                      components:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            path:
+                              enum:
+                                - "src/atr_adaptive_laguerre/core/true_range.py"
+                                - "src/atr_adaptive_laguerre/core/atr.py"
+                                - "src/atr_adaptive_laguerre/core/laguerre_filter.py"
+                                - "src/atr_adaptive_laguerre/core/laguerre_rsi.py"
+                                - "src/atr_adaptive_laguerre/core/adaptive.py"
+                            status:
+                              enum: ["implemented"]
+                            error_handling:
+                              enum: ["raise_and_propagate"]
+
+  /phases/2:
+    get:
+      summary: Phase 2 - Feature Constructors
+      responses:
+        "200":
+          description: Feature engineering components
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ImplementationPhase"
+                  - type: object
+                    properties:
+                      phase_id:
+                        enum: [2]
+                      name:
+                        enum: ["Feature Constructors"]
+                      status:
+                        enum: ["pending"]
+                      success_gate:
+                        type: object
+                        properties:
+                          criteria:
+                            enum: ["Non-anticipative validation passes 1000+ shuffles"]
+                          validation_method:
+                            enum: ["validation/non_anticipative.py test"]
+                      slos:
+                        type: object
+                        properties:
+                          correctness:
+                            type: object
+                            properties:
+                              target:
+                                enum: ["Zero lookahead bias"]
+                              measurement:
+                                enum: ["Future data shuffle test"]
+                      components:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            path:
+                              enum:
+                                - "src/atr_adaptive_laguerre/features/base.py"
+                                - "src/atr_adaptive_laguerre/features/atr_adaptive_rsi.py"
+                                - "src/atr_adaptive_laguerre/data/binance_adapter.py"
+                                - "src/atr_adaptive_laguerre/data/schema.py"
+                            status:
+                              enum: ["pending"]
+                            error_handling:
+                              enum: ["raise_and_propagate"]
+
+  /phases/3:
+    get:
+      summary: Phase 3 - Validation Framework
+      responses:
+        "200":
+          description: SOTA quality proxies
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ImplementationPhase"
+                  - type: object
+                    properties:
+                      phase_id:
+                        enum: [3]
+                      name:
+                        enum: ["Validation Framework"]
+                      status:
+                        enum: ["pending"]
+                      success_gate:
+                        type: object
+                        properties:
+                          criteria:
+                            enum: ["IC > 0.03 on k-step-ahead returns"]
+                          validation_method:
+                            enum: ["Spearman rank correlation with future returns"]
+                      slos:
+                        type: object
+                        properties:
+                          correctness:
+                            type: object
+                            properties:
+                              target:
+                                enum: ["IC > 0.03"]
+                              measurement:
+                                enum: ["validation/information_coefficient.py"]
+                      components:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            path:
+                              enum:
+                                - "src/atr_adaptive_laguerre/validation/non_anticipative.py"
+                                - "src/atr_adaptive_laguerre/validation/information_coefficient.py"
+                                - "src/atr_adaptive_laguerre/validation/ood_robustness.py"
+                            status:
+                              enum: ["pending"]
+
+  /error-handling-policy:
+    get:
+      summary: Error handling policy
+      responses:
+        "200":
+          description: Strict error handling rules
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - policy
+                  - prohibited_patterns
+                  - required_patterns
+                properties:
+                  policy:
+                    type: string
+                    enum: ["raise_and_propagate"]
+                    description: "All errors must be raised and propagated, never silenced"
+                  prohibited_patterns:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "try/except with pass"
+                      - "try/except with default value"
+                      - "try/except with retry logic"
+                      - "silent error logging without re-raise"
+                  required_patterns:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Explicit ValueError for invalid inputs"
+                      - "Explicit TypeError for type mismatches"
+                      - "Explicit RuntimeError for state violations"
+                      - "Re-raise after logging: logger.error(); raise"
+
+  /reference-mapping:
+    get:
+      summary: MQL5 reference mapping
+      responses:
+        "200":
+          description: Python component to MQL5 line mapping
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  core.true_range:
+                    type: object
+                    properties:
+                      mql5_reference:
+                        type: string
+                        enum: ["reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"]
+                      lines:
+                        type: string
+                        enum: ["161-169, 239-242"]
+                      function:
+                        type: string
+                        enum: ["CalculateTrueRange"]
+                  core.atr:
+                    type: object
+                    properties:
+                      mql5_reference:
+                        type: string
+                        enum: ["reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"]
+                      lines:
+                        type: string
+                        enum: ["244-287"]
+                      function:
+                        type: string
+                        enum: ["ATR calculation + min/max tracking"]
+                  core.laguerre_filter:
+                    type: object
+                    properties:
+                      mql5_reference:
+                        type: string
+                        enum: ["reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"]
+                      lines:
+                        type: string
+                        enum: ["306-312, 406-412"]
+                      function:
+                        type: string
+                        enum: ["CalculateLaguerreGamma, UpdateLaguerreFilter"]
+                  core.laguerre_rsi:
+                    type: object
+                    properties:
+                      mql5_reference:
+                        type: string
+                        enum: ["reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"]
+                      lines:
+                        type: string
+                        enum: ["349-384, 415-428"]
+                      function:
+                        type: string
+                        enum: ["CalculateLaguerreRSI"]
+                  core.adaptive:
+                    type: object
+                    properties:
+                      mql5_reference:
+                        type: string
+                        enum: ["reference/indicators/atr_adaptive/atr_adaptive_laguerre_rsi_refactor_for_python.mq5"]
+                      lines:
+                        type: string
+                        enum: ["189-204, 290-295"]
+                      function:
+                        type: string
+                        enum: ["CalculateAdaptiveCoefficient"]

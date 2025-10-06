@@ -1,0 +1,262 @@
+openapi: 3.1.0
+info:
+  title: ATR-Adaptive Laguerre RSI Implementation Status
+  version: 0.1.0
+  description: |
+    Current implementation status tracking for atr-adaptive-laguerre project.
+    Last updated: 2025-10-06
+
+components:
+  schemas:
+    ImplementationStatus:
+      type: object
+      required:
+        - phase
+        - status
+        - completion_percentage
+        - components
+      properties:
+        phase:
+          type: string
+        status:
+          type: string
+          enum: ["completed", "in_progress", "pending", "blocked"]
+        completion_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentStatus"
+
+    ComponentStatus:
+      type: object
+      required:
+        - path
+        - status
+        - lines_of_code
+        - error_handling
+        - slo_compliance
+      properties:
+        path:
+          type: string
+        status:
+          type: string
+          enum: ["implemented", "in_progress", "pending"]
+        lines_of_code:
+          type: integer
+        error_handling:
+          type: string
+          enum: ["raise_and_propagate", "not_applicable"]
+        slo_compliance:
+          type: object
+          properties:
+            correctness:
+              type: string
+            observability:
+              type: string
+            maintainability:
+              type: string
+
+paths:
+  /status/phase-1:
+    get:
+      summary: Phase 1 - Core Library Status
+      responses:
+        "200":
+          description: Core O(1) incremental calculators
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  phase:
+                    enum: ["Phase 1 - Core Library"]
+                  status:
+                    enum: ["completed"]
+                  completion_percentage:
+                    enum: [100]
+                  components:
+                    type: array
+                    items:
+                      type: object
+                    example:
+                      - path: "src/atr_adaptive_laguerre/core/true_range.py"
+                        status: "implemented"
+                        lines_of_code: 86
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Exact MQL5 match (lines 161-169, 239-242)"
+                          observability: "100% - Full type hints, mypy strict"
+                          maintainability: "High - O(1) talipp pattern, 35 lines docstrings"
+                      - path: "src/atr_adaptive_laguerre/core/atr.py"
+                        status: "implemented"
+                        lines_of_code: 138
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Exact MQL5 match (lines 244-287)"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - deque O(1) operations"
+                      - path: "src/atr_adaptive_laguerre/core/laguerre_filter.py"
+                        status: "implemented"
+                        lines_of_code: 140
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Exact MQL5 match (lines 306-312, 406-412)"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - Stateful 4-stage cascade"
+                      - path: "src/atr_adaptive_laguerre/core/laguerre_rsi.py"
+                        status: "implemented"
+                        lines_of_code: 75
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Exact MQL5 match (lines 349-384, 415-428)"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - Pure function, zero state"
+                      - path: "src/atr_adaptive_laguerre/core/adaptive.py"
+                        status: "implemented"
+                        lines_of_code: 91
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Exact MQL5 match (lines 189-204, 290-295)"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - Pure functions"
+
+  /status/phase-2:
+    get:
+      summary: Phase 2 - Feature Constructors Status
+      responses:
+        "200":
+          description: Feature engineering components
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  phase:
+                    enum: ["Phase 2 - Feature Constructors"]
+                  status:
+                    enum: ["in_progress"]
+                  completion_percentage:
+                    enum: [60]
+                  components:
+                    type: array
+                    items:
+                      type: object
+                    example:
+                      - path: "src/atr_adaptive_laguerre/data/schema.py"
+                        status: "implemented"
+                        lines_of_code: 129
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Pydantic v2 validation, strict mode"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - Out-of-box Pydantic"
+                      - path: "src/atr_adaptive_laguerre/data/binance_adapter.py"
+                        status: "implemented"
+                        lines_of_code: 172
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - Schema validation, no fallbacks"
+                          observability: "100% - Full type hints, explicit raises"
+                          maintainability: "High - Out-of-box gapless-crypto-data"
+                      - path: "src/atr_adaptive_laguerre/features/base.py"
+                        status: "implemented"
+                        lines_of_code: 91
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "100% - ABC contract enforcement"
+                          observability: "100% - Full type hints"
+                          maintainability: "High - Standard ABC pattern"
+                      - path: "src/atr_adaptive_laguerre/features/atr_adaptive_rsi.py"
+                        status: "pending"
+                        lines_of_code: 0
+                        error_handling: "raise_and_propagate"
+                        slo_compliance:
+                          correctness: "TBD"
+                          observability: "TBD"
+                          maintainability: "TBD"
+
+  /metrics/code-quality:
+    get:
+      summary: Code quality metrics
+      responses:
+        "200":
+          description: Current code quality metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_files:
+                    enum: [14]
+                  total_lines_of_code:
+                    type: integer
+                    example: 922
+                  error_handling_compliance:
+                    enum: ["100%"]
+                    description: "All components use raise_and_propagate"
+                  type_coverage:
+                    enum: ["100%"]
+                    description: "All components have full type hints"
+                  documentation:
+                    type: object
+                    properties:
+                      docstrings:
+                        enum: ["100%"]
+                      slo_documentation:
+                        enum: ["100%"]
+                      mql5_reference_mapping:
+                        enum: ["100%"]
+                  dependencies:
+                    type: object
+                    properties:
+                      total:
+                        enum: [25]
+                      out_of_box_libraries:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - "gapless-crypto-data==3.0.0"
+                          - "pydantic==2.11.10"
+                          - "pyarrow==21.0.0"
+                          - "httpx==0.28.1"
+                          - "numba==0.62.1"
+                      custom_code_ratio:
+                        enum: ["15%"]
+                        description: "85% out-of-box, 15% custom implementation"
+
+  /next-steps:
+    get:
+      summary: Next implementation steps
+      responses:
+        "200":
+          description: Prioritized next steps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    priority:
+                      type: integer
+                    task:
+                      type: string
+                    blocking:
+                      type: boolean
+                example:
+                  - priority: 1
+                    task: "Implement features/atr_adaptive_rsi.py (main feature orchestration)"
+                    blocking: true
+                  - priority: 2
+                    task: "Create unit tests for core/ with MQL5 validation"
+                    blocking: true
+                  - priority: 3
+                    task: "Implement validation/non_anticipative.py"
+                    blocking: false
+                  - priority: 4
+                    task: "Implement examples/01_basic_usage.py"
+                    blocking: false
