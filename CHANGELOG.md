@@ -5,6 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-10-06
+
+### Added
+
+#### API Discoverability (P0 - Critical UX Fix)
+
+- **Factory methods for clear intent**
+  - `ATRAdaptiveLaguerreRSIConfig.single_interval()` - Creates config for 27-feature mode (explicit)
+  - `ATRAdaptiveLaguerreRSIConfig.multi_interval()` - Creates config for 121-feature mode (explicit)
+  - Resolves confusion where users missed that 121 features exist (only found 27)
+  - Example:
+    ```python
+    # Clear: single-interval (27 features)
+    config = ATRAdaptiveLaguerreRSIConfig.single_interval()
+
+    # Clear: multi-interval (121 features at 1h, 4h, 12h)
+    config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+        multiplier_1=4,   # 4x base interval
+        multiplier_2=12   # 12x base interval
+    )
+    ```
+
+- **Feature introspection properties**
+  - `n_features` property: Returns 27 or 121 based on config
+  - `feature_mode` property: Returns "single-interval" or "multi-interval"
+  - Enables programmatic feature count discovery before extraction
+  - Example:
+    ```python
+    indicator = ATRAdaptiveLaguerreRSI(config)
+    print(f"Mode: {indicator.feature_mode}, Features: {indicator.n_features}")
+    # "Mode: multi-interval, Features: 121"
+    ```
+
+### Fixed
+
+#### Multi-Interval Mode (P0 - Critical)
+
+- **`min_lookback` now correctly reflects multi-interval requirements**
+  - Returns 360 for multi-interval (was incorrectly returning 30)
+  - Calculation: base_lookback × max_multiplier (e.g., 30 × 12 = 360)
+  - Prevents "insufficient data" runtime errors
+  - Example:
+    ```python
+    config = ATRAdaptiveLaguerreRSIConfig.multi_interval()
+    indicator = ATRAdaptiveLaguerreRSI(config)
+    print(indicator.min_lookback)  # 360 (was 30 in v0.2.0)
+    ```
+
+- **`date_column` parameter now works in multi-interval mode** (P1 - High)
+  - `MultiIntervalProcessor` now accepts and uses `date_column` parameter
+  - Previously hardcoded 'date' column, ignoring config
+  - Now consistent with single-interval behavior
+  - Example:
+    ```python
+    config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+        date_column='actual_ready_time'
+    )
+    # Now works correctly (was broken in v0.2.0)
+    features = ATRAdaptiveLaguerreRSI(config).fit_transform_features(df)
+    ```
+
+- **Base RSI calculation validation decoupled from multi-interval requirements**
+  - `fit_transform()` now validates only base_lookback (not min_lookback)
+  - Allows using multi-interval configs with small datasets for base RSI only
+  - Multi-interval validation still enforced in `fit_transform_features()`
+
+### Improved
+
+#### Developer Experience
+
+- Better error messages distinguish between base RSI and multi-interval data requirements
+- `min_lookback` property documentation clarifies automatic mode detection
+- Factory methods provide clear discoverability path for new users
+
+### Documentation
+
+- Updated inline docstrings for new factory methods and properties
+- Added examples demonstrating clear API usage patterns
+- Test suite expanded with 7 UX improvement tests
+
+### Impact
+
+This release fixes critical API discoverability issues identified by engineering leads:
+- Even experienced developers missed that 121 features exist
+- `min_lookback` returned wrong value, causing runtime errors
+- `date_column` parameter didn't work for multi-interval mode
+
+These fixes ensure junior developers can easily discover and use multi-interval mode.
+
+---
+
 ## [0.2.0] - 2025-10-06
 
 ### Added

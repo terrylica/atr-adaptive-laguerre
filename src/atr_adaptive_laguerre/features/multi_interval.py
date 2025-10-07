@@ -34,13 +34,14 @@ class MultiIntervalProcessor:
     - Forward-fill uses last known value (no future data)
     """
 
-    def __init__(self, multiplier_1: int, multiplier_2: int):
+    def __init__(self, multiplier_1: int, multiplier_2: int, date_column: str = "date"):
         """
         Initialize multi-interval processor.
 
         Args:
             multiplier_1: First higher interval multiplier (e.g., 3 for 3× base)
             multiplier_2: Second higher interval multiplier (e.g., 12 for 12× base)
+            date_column: Name of datetime column for resampling (default: 'date')
 
         Raises:
             ValueError: If multipliers not integers
@@ -57,6 +58,7 @@ class MultiIntervalProcessor:
 
         self.multiplier_1 = multiplier_1
         self.multiplier_2 = multiplier_2
+        self.date_column = date_column
 
     def resample_and_extract(
         self,
@@ -147,18 +149,18 @@ class MultiIntervalProcessor:
         Raises:
             ValueError: If df not DataFrame
             ValueError: If missing required columns
-            ValueError: If date not monotonic increasing
+            ValueError: If date column not monotonic increasing
         """
         if not isinstance(df, pd.DataFrame):
             raise ValueError(f"df must be pd.DataFrame, got {type(df)}")
 
-        required_cols = {"date", "open", "high", "low", "close", "volume"}
+        required_cols = {self.date_column, "open", "high", "low", "close", "volume"}
         missing = required_cols - set(df.columns)
         if missing:
             raise ValueError(f"df missing required OHLCV columns: {missing}")
 
-        if not df["date"].is_monotonic_increasing:
-            raise ValueError("df.date must be monotonic increasing (sorted chronologically)")
+        if not df[self.date_column].is_monotonic_increasing:
+            raise ValueError(f"df.{self.date_column} must be monotonic increasing (sorted chronologically)")
 
     def _resample_ohlcv(self, df: pd.DataFrame, multiplier: int) -> pd.DataFrame:
         """
@@ -182,14 +184,14 @@ class MultiIntervalProcessor:
         Non-anticipative: Resampling uses only bars in [window_start, window_end].
         Only complete windows (with full multiplier bars) are retained.
         """
-        # Set date as index for resampling
-        df_indexed = df.set_index("date")
+        # Set date column as index for resampling
+        df_indexed = df.set_index(self.date_column)
 
         # Infer base frequency from first two timestamps
         if len(df) < 2:
             raise ValueError(f"df too short for resampling: need >= 2 bars, got {len(df)}")
 
-        base_freq = df["date"].iloc[1] - df["date"].iloc[0]
+        base_freq = df[self.date_column].iloc[1] - df[self.date_column].iloc[0]
 
         # Calculate higher frequency
         higher_freq = base_freq * multiplier

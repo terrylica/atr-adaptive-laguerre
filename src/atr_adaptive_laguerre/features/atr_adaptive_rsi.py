@@ -109,6 +109,92 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
                 )
         return v
 
+    @classmethod
+    def single_interval(
+        cls,
+        atr_period: int = 14,
+        smoothing_period: int = 5,
+        date_column: str = "date",
+        **kwargs
+    ) -> "ATRAdaptiveLaguerreRSIConfig":
+        """
+        Create single-interval configuration (27 features).
+
+        Features: Base RSI, regime classification, crossings, momentum, statistics.
+        Lookback: ~30 periods
+
+        Args:
+            atr_period: ATR lookback period (default: 14)
+            smoothing_period: Price smoothing period (default: 5)
+            date_column: Name of datetime column (default: 'date')
+            **kwargs: Additional config parameters
+
+        Returns:
+            Config for 27-feature output
+
+        Example:
+            >>> config = ATRAdaptiveLaguerreRSIConfig.single_interval()
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.n_features  # 27
+        """
+        return cls(
+            atr_period=atr_period,
+            smoothing_period=smoothing_period,
+            date_column=date_column,
+            **kwargs
+        )
+
+    @classmethod
+    def multi_interval(
+        cls,
+        multiplier_1: int = 4,
+        multiplier_2: int = 12,
+        atr_period: int = 14,
+        smoothing_period: int = 5,
+        date_column: str = "date",
+        **kwargs
+    ) -> "ATRAdaptiveLaguerreRSIConfig":
+        """
+        Create multi-interval configuration (121 features).
+
+        Features:
+        - Base interval (27): All single-interval features with _base suffix
+        - Multiplier 1 (27): Features at {multiplier_1}× timeframe with _mult1 suffix
+        - Multiplier 2 (27): Features at {multiplier_2}× timeframe with _mult2 suffix
+        - Cross-interval (40): Regime alignment, divergence, momentum patterns
+
+        Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
+
+        Args:
+            multiplier_1: First interval multiplier (default: 4 = 4× base timeframe)
+            multiplier_2: Second interval multiplier (default: 12 = 12× base timeframe)
+            atr_period: ATR lookback period (default: 14)
+            smoothing_period: Price smoothing period (default: 5)
+            date_column: Name of datetime column (default: 'date')
+            **kwargs: Additional config parameters
+
+        Returns:
+            Config for 121-feature output
+
+        Example:
+            >>> # For 1h base data: generates features at 1h, 4h, 12h intervals
+            >>> config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+            ...     multiplier_1=4,  # 4h
+            ...     multiplier_2=12  # 12h
+            ... )
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.n_features  # 121
+            >>> indicator.min_lookback  # 360
+        """
+        return cls(
+            atr_period=atr_period,
+            smoothing_period=smoothing_period,
+            multiplier_1=multiplier_1,
+            multiplier_2=multiplier_2,
+            date_column=date_column,
+            **kwargs
+        )
+
 
 class ATRAdaptiveLaguerreRSI(BaseFeature):
     """
@@ -236,14 +322,22 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
                 f"Required: {required_cols}"
             )
 
-        # Validate sufficient lookback
-        if len(df) < self.min_lookback:
+        # Validate sufficient lookback for base RSI calculation
+        # Note: fit_transform() only needs base_lookback, not full min_lookback
+        # (min_lookback includes multi-interval requirements)
+        base_lookback = max(
+            self.config.atr_period,
+            self.config.smoothing_period,
+            20,  # Rolling statistics window
+        ) + 10  # Buffer for filter warmup
+
+        if len(df) < base_lookback:
             raise ValueError(
                 f"Insufficient data: {len(df)} rows provided, "
-                f"{self.min_lookback} required\n"
+                f"{base_lookback} required\n"
                 f"\nConfiguration: atr_period={self.config.atr_period}, "
                 f"smoothing_period={self.config.smoothing_period}\n"
-                f"Hint: Provide at least {self.min_lookback} historical bars."
+                f"Hint: Provide at least {base_lookback} historical bars."
             )
 
         # Extract OHLC arrays
@@ -295,44 +389,76 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
     @property
     def min_lookback(self) -> int:
         """
-        Minimum required historical periods for stable computation.
+        Minimum required historical periods for this configuration.
 
-        Returns minimum bars needed based on configuration parameters.
-        Calculated as max of all window sizes plus buffer for edge effects.
+        Automatically accounts for single-interval vs multi-interval mode.
 
-        Note: This returns the base lookback without multiplier adjustment.
-        For multi-interval mode, use min_lookback_base_interval property.
+        Single-interval: ~30 periods (max(atr_period, smoothing_period, 20) + buffer)
+        Multi-interval: ~360 periods (ensures sufficient data after resampling)
 
         Returns:
-            Minimum number of bars required for valid feature extraction
+            Minimum rows required in input DataFrame
+
+        Example:
+            >>> config = ATRAdaptiveLaguerreRSIConfig(atr_period=14)
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.min_lookback  # 30 (single-interval)
+
+            >>> config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=4, multiplier_2=12)
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.min_lookback  # 360 (multi-interval)
         """
-        return max(
+        base_lookback = max(
             self.config.atr_period,
             self.config.smoothing_period,
             20,  # Rolling statistics window
         ) + 10  # Buffer for filter warmup
 
-    @property
-    def min_lookback_base_interval(self) -> int:
-        """
-        Minimum required bars for base interval in multi-interval mode.
-
-        For multi-interval processing, the base interval needs enough bars
-        such that after resampling by max_multiplier, each interval still
-        has min_lookback bars.
-
-        Returns:
-            Minimum number of base interval bars for multi-interval mode
-        """
-        base_lookback = self.min_lookback
-
-        # For multi-interval, multiply by max resampling factor to ensure
-        # sufficient data after resampling
+        # Multi-interval needs enough data to fill resampled intervals
         if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
             max_multiplier = max(self.config.multiplier_1, self.config.multiplier_2)
             return base_lookback * max_multiplier
 
         return base_lookback
+
+    @property
+    def n_features(self) -> int:
+        """
+        Number of features this configuration will generate.
+
+        Returns:
+            27 for single-interval mode
+            121 for multi-interval mode (27×3 intervals + 40 cross-interval)
+
+        Example:
+            >>> config = ATRAdaptiveLaguerreRSIConfig()
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.n_features  # 27
+
+            >>> config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=4, multiplier_2=12)
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.n_features  # 121
+        """
+        if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
+            return 121  # Multi-interval: 27×3 + 40 cross-interval
+        return 27  # Single-interval
+
+    @property
+    def feature_mode(self) -> str:
+        """
+        Feature generation mode for this configuration.
+
+        Returns:
+            'single-interval' or 'multi-interval'
+
+        Example:
+            >>> config = ATRAdaptiveLaguerreRSIConfig()
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> indicator.feature_mode  # 'single-interval'
+        """
+        if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
+            return "multi-interval"
+        return "single-interval"
 
     def update(self, ohlcv_row: dict) -> float:
         """
@@ -555,7 +681,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # For multi-interval mode, validate sufficient base interval data
         if mult1 is not None and mult2 is not None:
-            required_bars = self.min_lookback_base_interval
+            required_bars = self.min_lookback  # Now accounts for multi-interval automatically
             if len(df) < required_bars:
                 raise ValueError(
                     f"Insufficient data for multi-interval mode: {len(df)} rows provided, "
@@ -584,7 +710,11 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             return features_base
 
         # Multi-interval mode: Extract features for all 3 intervals
-        processor = MultiIntervalProcessor(multiplier_1=mult1, multiplier_2=mult2)
+        processor = MultiIntervalProcessor(
+            multiplier_1=mult1,
+            multiplier_2=mult2,
+            date_column=self.config.date_column
+        )
 
         # Resample and extract features (returns 81 columns: 27 × 3)
         features_all_intervals = processor.resample_and_extract(
