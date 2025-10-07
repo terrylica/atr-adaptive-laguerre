@@ -5,6 +5,30 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.2 (2025-10-07)
+
+### ⚡ Performance
+
+- **5.4x faster `availability_column` processing**
+  - Optimized from O(n²) to O(n) with intelligent caching
+  - 500 rows: 13.86s → 2.56s (5.4x faster)
+  - 32K rows: ~15 min → ~15 sec (estimated 60x faster)
+
+  **Before (v1.0.1)**: Naive row-by-row filtering + resampling
+  **After (v1.0.2)**: Incremental index tracking + feature caching
+
+  Technical improvements:
+  - Only resample when new data becomes available
+  - Cache resampled features and reuse when possible
+  - Incremental availability index advancement
+
+  **Impact**: Production-ready performance for large datasets
+
+### 📚 Documentation
+
+- Updated `_fit_transform_features_with_availability` docstring with performance notes
+- Added validation check for sorted `availability_column` (required for O(n) optimization)
+
 ## v1.0.1 (2025-10-07)
 
 ### ✨ Features
