@@ -30,3 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Correct GitHub organization name in documentation links (v0.1.2) - Updated README links from eonlabs to Eon-Labs - Updated pyproject.toml repository URLs - Bumped version to 0.1.2
 
+## v1.0.0 (2025-10-07)
+
+### BREAKING CHANGE
+
+- filter_redundancy now defaults to True instead of False.
+Multi-interval configurations now return 79 features by default (was 121).
+- min_lookback property behavior changed for multi-interval mode
+
+### Feat
+
+- enable redundancy filtering by default (121→79 features)
+- **ux**: improve API discoverability for multi-interval mode (v0.2.1)
+- **api**: implement v0.2.0 production-ready enhancements
+- initial PyPI release v0.1.1
+- **validation**: implement Phase 3 Validation Framework
+- **features**: implement ATR-Adaptive Laguerre RSI main orchestrator
+- implement core library and data adapters (Phase 1+2 partial)
+
+### Fix
+
+- correct GitHub organization name in documentation links (v0.1.2)
