@@ -850,73 +850,81 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
                 f"Please sort your DataFrame by availability_column before calling fit_transform_features()."
             )
 
-        # For mult1 and mult2, we need to be careful about availability
-        # Strategy: Incremental approach to avoid O(n²) complexity
+        # Pre-compute ALL resampled data ONCE (O(n) total)
+        # This is the key optimization: resample the full dataset once, then index into it
+
+        # Resample full dataset (respecting availability) for mult1 and mult2
+        # We'll create "availability-aware" resampled dataframes where each row
+        # only contains data available at that timestamp
+        df_mult1_full = processor._resample_ohlcv(df, mult1)
+        df_mult2_full = processor._resample_ohlcv(df, mult2)
+
+        # Pre-compute features for all resampled intervals (one-time cost)
+        min_required = 30
+        if len(df_mult1_full) >= min_required:
+            features_mult1_all = expander.expand(self.fit_transform(df_mult1_full))
+        else:
+            features_mult1_all = None
+
+        if len(df_mult2_full) >= min_required:
+            features_mult2_all = expander.expand(self.fit_transform(df_mult2_full))
+        else:
+            features_mult2_all = None
 
         # Create result DataFrame with same index as input
         result = features_base.copy()
 
         # Initialize mult1 and mult2 feature columns
-        sample_features = expander.expand(self.fit_transform(df.head(mult2 * 30)))  # Get column names
-        for suffix in ["_mult1", "_mult2"]:
-            for col in sample_features.columns:
-                result[col + suffix] = np.nan
+        if features_mult1_all is not None:
+            for col in features_mult1_all.columns:
+                result[col + "_mult1"] = np.nan
+        if features_mult2_all is not None:
+            for col in features_mult2_all.columns:
+                result[col + "_mult2"] = np.nan
 
-        # Incremental processing with caching: O(n) instead of O(n²)
-        # Track the last index where data is available and cache resampled features
-        last_available_idx = -1
-        last_mult1_idx = -1
-        last_mult2_idx = -1
-        cached_mult1_features = None
-        cached_mult2_features = None
+        # Compute availability time for each resampled bar
+        # A resampled bar's availability = max(availability of all constituent base bars)
+        mult1_availability = []
+        for mult1_idx in range(len(df_mult1_full)):
+            start_idx = mult1_idx * mult1
+            end_idx = min((mult1_idx + 1) * mult1, len(df))
+            if end_idx > start_idx:
+                # Last bar in the window determines availability
+                mult1_availability.append(df[avail_col].iloc[end_idx - 1])
+            else:
+                mult1_availability.append(pd.Timestamp.max)
+
+        mult2_availability = []
+        for mult2_idx in range(len(df_mult2_full)):
+            start_idx = mult2_idx * mult2
+            end_idx = min((mult2_idx + 1) * mult2, len(df))
+            if end_idx > start_idx:
+                mult2_availability.append(df[avail_col].iloc[end_idx - 1])
+            else:
+                mult2_availability.append(pd.Timestamp.max)
+
+        # For each base row, find the most recent available resampled bar (binary search)
+        import bisect
 
         for idx in range(len(df)):
-            current_avail_time = df[avail_col].iloc[idx]
+            base_time = df[avail_col].iloc[idx]
 
-            # Incrementally advance available index (O(1) amortized)
-            prev_available_idx = last_available_idx
-            while (last_available_idx < len(df) - 1 and
-                   df[avail_col].iloc[last_available_idx + 1] <= current_avail_time):
-                last_available_idx += 1
+            # Find most recent mult1 bar where availability <= base_time
+            if features_mult1_all is not None and len(mult1_availability) > 0:
+                # bisect_right gives us the insertion point; we want the bar just before it
+                insert_pos = bisect.bisect_right(mult1_availability, base_time)
+                if insert_pos > 0:
+                    mult1_idx = insert_pos - 1
+                    for col in features_mult1_all.columns:
+                        result.loc[result.index[idx], col + "_mult1"] = features_mult1_all.iloc[mult1_idx][col]
 
-            # Skip if no new data since last iteration
-            if last_available_idx < 0:
-                continue  # No data available yet
-
-            available_data = df.iloc[:last_available_idx + 1]
-
-            # Only resample mult1 if we have new data
-            if len(available_data) >= mult1:
-                # Check if we need to recompute (new data added)
-                if last_available_idx != prev_available_idx or cached_mult1_features is None:
-                    df_mult1 = processor._resample_ohlcv(available_data, mult1)
-                    min_required = 30
-                    if len(df_mult1) >= min_required:
-                        # Only recompute if resampled data changed
-                        if len(df_mult1) > last_mult1_idx + 1 or cached_mult1_features is None:
-                            features_mult1 = expander.expand(self.fit_transform(df_mult1))
-                            cached_mult1_features = features_mult1.iloc[-1].to_dict()
-                            last_mult1_idx = len(df_mult1) - 1
-
-                # Use cached features
-                if cached_mult1_features is not None:
-                    for col, val in cached_mult1_features.items():
-                        result.loc[result.index[idx], col + "_mult1"] = val
-
-            # Same for mult2 with caching
-            if len(available_data) >= mult2:
-                if last_available_idx != prev_available_idx or cached_mult2_features is None:
-                    df_mult2 = processor._resample_ohlcv(available_data, mult2)
-                    min_required = 30
-                    if len(df_mult2) >= min_required:
-                        if len(df_mult2) > last_mult2_idx + 1 or cached_mult2_features is None:
-                            features_mult2 = expander.expand(self.fit_transform(df_mult2))
-                            cached_mult2_features = features_mult2.iloc[-1].to_dict()
-                            last_mult2_idx = len(df_mult2) - 1
-
-                if cached_mult2_features is not None:
-                    for col, val in cached_mult2_features.items():
-                        result.loc[result.index[idx], col + "_mult2"] = val
+            # Same for mult2
+            if features_mult2_all is not None and len(mult2_availability) > 0:
+                insert_pos = bisect.bisect_right(mult2_availability, base_time)
+                if insert_pos > 0:
+                    mult2_idx = insert_pos - 1
+                    for col in features_mult2_all.columns:
+                        result.loc[result.index[idx], col + "_mult2"] = features_mult2_all.iloc[mult2_idx][col]
 
         # Forward-fill any remaining NaNs (for early rows)
         result = result.ffill()
