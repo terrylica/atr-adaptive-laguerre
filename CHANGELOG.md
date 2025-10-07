@@ -5,7 +5,40 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.5 (2025-10-07)
+
+### 🐛 Critical Bug Fix
+
+- **Fixed data leakage in mult1/mult2 intervals at boundary conditions** (CRITICAL)
+  - v1.0.4 introduced a boundary condition bug when validation times aligned exactly with resampled bar timestamps
+  - **Root cause**: Used `np.searchsorted(..., side='right')` which incorrectly included bars with `availability == base_time`
+  - **Fix**: Changed to `side='left'` to ensure strict inequality (`availability < base_time`)
+  - **Impact**: Prevents future data leakage at specific timestamps (25% failure rate in v1.0.4)
+
+  **Details**:
+  - When a mult1 resampled bar's availability time equals validation time, that bar should be **excluded** (not available yet)
+  - v1.0.4 incorrectly included it due to `searchsorted` boundary semantics
+  - Example: At validation time 04:00:00, mult1 bar at 04:00:00 (ready 06:00:00) was incorrectly used
+  - v1.0.5 correctly uses previous bar (20:00:00, ready 22:00:00)
+
+  **Validation**:
+  - All 41 tests pass
+  - Boundary condition test confirms no leakage at critical timestamps
+  - No performance regression (still 54x faster than v1.0.3)
+
+### 🙏 Acknowledgments
+
+- Thank you to the user who discovered this critical bug through comprehensive validation testing
+- The detailed bug report with specific failing timestamps enabled rapid diagnosis and fix
+- This highlights the importance of testing at exact boundary conditions, not just random timestamps
+
 ## v1.0.4 (2025-10-07)
+
+### ⚠️ Note
+
+**This version has a CRITICAL DATA LEAKAGE BUG at boundary conditions.**
+The bug occurs when validation times align exactly with mult1/mult2 resampled bar timestamps (25% failure rate).
+**Use v1.0.5 instead, which fixes the searchsorted boundary condition bug.**
 
 ### ⚡ Performance
 

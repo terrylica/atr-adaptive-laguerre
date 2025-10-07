@@ -893,7 +893,9 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             mult1_availability = df[avail_col].iloc[mult1_end_indices].values
 
             # Vectorized searchsorted: find which mult1 bar to use for each base row
-            mult1_indices = np.searchsorted(mult1_availability, base_times, side='right') - 1
+            # Use 'left' to get first bar where availability >= base_time, then go back 1
+            # This ensures we only use bars where availability < base_time (strict)
+            mult1_indices = np.searchsorted(mult1_availability, base_times, side='left') - 1
             mult1_indices = np.maximum(mult1_indices, 0)  # Clamp to valid range
             mult1_indices = np.minimum(mult1_indices, len(features_mult1_all) - 1)
 
@@ -907,7 +909,8 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             mult2_end_indices = np.maximum(mult2_end_indices, 0)
             mult2_availability = df[avail_col].iloc[mult2_end_indices].values
 
-            mult2_indices = np.searchsorted(mult2_availability, base_times, side='right') - 1
+            # Use 'left' to ensure strict inequality (availability < base_time)
+            mult2_indices = np.searchsorted(mult2_availability, base_times, side='left') - 1
             mult2_indices = np.maximum(mult2_indices, 0)
             mult2_indices = np.minimum(mult2_indices, len(features_mult2_all) - 1)
 
