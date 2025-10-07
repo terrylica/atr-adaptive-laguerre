@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-10-06
+
+### Added
+
+#### API Enhancements (Critical for Production Integration)
+
+- **Flexible datetime column support** (P0 - Critical)
+  - Accept `date` column, DatetimeIndex, or custom column name via `date_column` config parameter
+  - Automatically detect and use pandas DatetimeIndex if available
+  - Example: `ATRAdaptiveLaguerreRSIConfig(date_column='actual_ready_time')`
+  - Resolves incompatibility with ml-feature-set framework and other pipelines using custom datetime columns
+
+- **Incremental update API** (P0 - Critical)
+  - New `update(ohlcv_row: dict) -> float` method for O(1) streaming updates
+  - Maintains internal state across calls (ATRState, LaguerreFilterState, TrueRangeState)
+  - Enables efficient online computation without reprocessing entire history
+  - Example:
+    ```python
+    indicator.fit_transform(historical_df)  # Initialize
+    new_rsi = indicator.update(new_row)     # O(1) incremental update
+    ```
+
+- **Programmatic lookback introspection** (P1 - High)
+  - New `min_lookback` property: returns base lookback requirement (single-interval mode)
+  - New `min_lookback_base_interval` property: returns adjusted lookback for multi-interval mode
+  - Accounts for ATR period, smoothing period, stats window, and multi-interval multipliers
+  - Eliminates trial-and-error for determining required historical data
+  - Example:
+    ```python
+    indicator = ATRAdaptiveLaguerreRSI(config)
+    print(f"Need {indicator.min_lookback_base_interval} bars")  # e.g., 360 for 12× multiplier
+    ```
+
+### Improved
+
+#### Error Messages (P2 - Medium)
+
+- All validation errors now include:
+  - What's missing/invalid
+  - What's currently available (e.g., actual column names)
+  - Hints for resolution (e.g., "Use date_column='your_column' parameter")
+  - Configuration context (current atr_period, smoothing_period, multipliers)
+- Example improved error:
+  ```
+  ValueError: DataFrame missing required OHLCV columns: {'close'}
+
+  Available columns: ['date', 'open', 'high', 'low', 'volume']
+  Required: ['open', 'high', 'low', 'close', 'volume']
+  ```
+
+### Fixed
+
+- Multi-interval validation: `min_lookback` now correctly handles resampled data validation
+  - Base interval uses `min_lookback_base_interval` (multiplied by max_multiplier)
+  - Resampled intervals use `min_lookback` (base requirement without multiplier)
+  - Prevents false "insufficient data" errors when processing mult1/mult2 intervals
+
+### Changed
+
+- **Breaking**: Removed multiplier adjustment from `min_lookback` property
+  - Old behavior: `min_lookback` returned `base_lookback * max_multiplier` in multi-interval mode
+  - New behavior: `min_lookback` always returns base lookback (without multiplier)
+  - Migration: Use `min_lookback_base_interval` for multi-interval base data validation
+  - Rationale: Clearer separation between single-interval and multi-interval requirements
+
+### Documentation
+
+- Updated README with new v0.2.0 features:
+  - Flexible datetime column examples
+  - Incremental update usage
+  - Multi-interval lookback requirements
+- Added comprehensive docstrings for new methods and properties
+- Updated test suite (21 tests, 100% passing)
+
+### Internal
+
+- Enhanced state management for incremental updates
+- Improved multi-interval data validation logic
+- Increased test data sizes to accommodate multi-interval scenarios (600-1500 bars)
+
+---
+
 ## [0.1.2] - 2025-10-06
 
 ### Fixed

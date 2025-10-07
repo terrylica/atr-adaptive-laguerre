@@ -38,7 +38,7 @@ def sample_ohlcv() -> pd.DataFrame:
     - Enough bars for multi-interval resampling (500 bars / 12 = ~41 bars)
     """
     np.random.seed(42)
-    n_bars = 500
+    n_bars = 600  # Increased for multi-interval (42 * 12 = 504 minimum)
 
     # Generate base price with trend + noise
     base_price = 100 + np.cumsum(np.random.randn(n_bars) * 0.5)
@@ -492,8 +492,10 @@ class TestFullFeaturePipeline:
         2. Cross-interval interactions derived from base features are deterministic
         3. Output shape is correct (121 columns)
         """
-        # Configure multi-interval extraction
-        config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=3, multiplier_2=12)
+        # Configure multi-interval extraction with smaller periods to fit in sample data
+        config = ATRAdaptiveLaguerreRSIConfig(
+            atr_period=14, smoothing_period=5, multiplier_1=3, multiplier_2=12
+        )
         feature = ATRAdaptiveLaguerreRSI(config)
 
         # Compute full 121 features
@@ -561,7 +563,7 @@ class TestFullFeaturePipeline:
             feature.fit_transform_features(df)
 
         # Test invalid OHLCV (missing columns)
-        with pytest.raises(ValueError, match="missing required columns"):
+        with pytest.raises(ValueError, match="datetime column|missing required"):
             config = ATRAdaptiveLaguerreRSIConfig()
             feature = ATRAdaptiveLaguerreRSI(config)
             df = pd.DataFrame({"close": np.random.rand(100)})
@@ -573,7 +575,9 @@ class TestFullFeaturePipeline:
 
         Same input → same output (no randomness).
         """
-        config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=3, multiplier_2=12)
+        config = ATRAdaptiveLaguerreRSIConfig(
+            atr_period=14, smoothing_period=5, multiplier_1=3, multiplier_2=12
+        )
         feature = ATRAdaptiveLaguerreRSI(config)
 
         # Compute features twice

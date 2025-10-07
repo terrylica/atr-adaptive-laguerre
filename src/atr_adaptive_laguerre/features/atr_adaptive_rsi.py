@@ -19,7 +19,7 @@ MQL5 Reference:
 - Algorithm: TR → ATR → adaptive coefficient → Laguerre filter → Laguerre RSI
 """
 
-from typing import Literal
+from typing import Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -81,6 +81,10 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         default=None,
         ge=2,
         description="Second higher interval multiplier (e.g., 12 for 12× base)",
+    )
+    date_column: str = Field(
+        default="date",
+        description="Name of datetime column (or use datetime index if None)",
     )
 
     @field_validator("level_down")
@@ -152,6 +156,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         super().__init__(config)
         self.config: ATRAdaptiveLaguerreRSIConfig = config
 
+        # Initialize stateful components for incremental updates
+        self._tr_state: Optional[TrueRangeState] = None
+        self._atr_state: Optional[ATRState] = None
+        self._laguerre_state: Optional[LaguerreFilterState] = None
+        self._history: list = []  # Store recent bars for rolling statistics
+
     def fit_transform(self, df: pd.DataFrame) -> pd.Series:
         """
         Transform OHLCV data to ATR-Adaptive Laguerre RSI values.
@@ -191,15 +201,50 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         if not isinstance(df, pd.DataFrame):
             raise TypeError(f"df must be pd.DataFrame, got {type(df)}")
 
-        # Validate required columns (raise KeyError if missing)
-        required_cols = ["date", "open", "high", "low", "close", "volume"]
+        # Extract datetime information from multiple sources
+        date_col = self.config.date_column
+        if date_col in df.columns:
+            # Use specified column
+            timestamps = pd.to_datetime(df[date_col])
+            if not timestamps.is_monotonic_increasing:
+                raise ValueError(
+                    f"DataFrame must be sorted chronologically (ascending {date_col})"
+                )
+        elif isinstance(df.index, pd.DatetimeIndex):
+            # Use datetime index
+            timestamps = df.index
+            if not timestamps.is_monotonic_increasing:
+                raise ValueError(
+                    "DataFrame datetime index must be sorted chronologically (ascending)"
+                )
+        else:
+            # Error with helpful context
+            raise ValueError(
+                f"DataFrame must have datetime column '{date_col}' or DatetimeIndex.\n"
+                f"\nAvailable columns: {list(df.columns)}\n"
+                f"Index type: {type(df.index).__name__}\n"
+                f"\nHint: Pass date_column='your_column' to config, or use DatetimeIndex."
+            )
+
+        # Validate required OHLCV columns
+        required_cols = ["open", "high", "low", "close", "volume"]
         missing = set(required_cols) - set(df.columns)
         if missing:
-            raise ValueError(f"df missing required columns: {missing}")
+            raise ValueError(
+                f"DataFrame missing required OHLCV columns: {missing}\n"
+                f"\nAvailable columns: {list(df.columns)}\n"
+                f"Required: {required_cols}"
+            )
 
-        # Validate chronological order (non-anticipative requirement)
-        if not df["date"].is_monotonic_increasing:
-            raise ValueError("df must be sorted chronologically (ascending date)")
+        # Validate sufficient lookback
+        if len(df) < self.min_lookback:
+            raise ValueError(
+                f"Insufficient data: {len(df)} rows provided, "
+                f"{self.min_lookback} required\n"
+                f"\nConfiguration: atr_period={self.config.atr_period}, "
+                f"smoothing_period={self.config.smoothing_period}\n"
+                f"Hint: Provide at least {self.min_lookback} historical bars."
+            )
 
         # Extract OHLC arrays
         high = df["high"].values
@@ -246,6 +291,129 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # Return as Series with same index as input
         return pd.Series(rsi_values, index=df.index, name="atr_adaptive_laguerre_rsi")
+
+    @property
+    def min_lookback(self) -> int:
+        """
+        Minimum required historical periods for stable computation.
+
+        Returns minimum bars needed based on configuration parameters.
+        Calculated as max of all window sizes plus buffer for edge effects.
+
+        Note: This returns the base lookback without multiplier adjustment.
+        For multi-interval mode, use min_lookback_base_interval property.
+
+        Returns:
+            Minimum number of bars required for valid feature extraction
+        """
+        return max(
+            self.config.atr_period,
+            self.config.smoothing_period,
+            20,  # Rolling statistics window
+        ) + 10  # Buffer for filter warmup
+
+    @property
+    def min_lookback_base_interval(self) -> int:
+        """
+        Minimum required bars for base interval in multi-interval mode.
+
+        For multi-interval processing, the base interval needs enough bars
+        such that after resampling by max_multiplier, each interval still
+        has min_lookback bars.
+
+        Returns:
+            Minimum number of base interval bars for multi-interval mode
+        """
+        base_lookback = self.min_lookback
+
+        # For multi-interval, multiply by max resampling factor to ensure
+        # sufficient data after resampling
+        if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
+            max_multiplier = max(self.config.multiplier_1, self.config.multiplier_2)
+            return base_lookback * max_multiplier
+
+        return base_lookback
+
+    def update(self, ohlcv_row: dict) -> float:
+        """
+        Update indicator with single new OHLCV row (O(1) incremental update).
+
+        Enables efficient streaming updates without recomputing entire history.
+        Maintains internal state across calls for O(1) complexity.
+
+        Args:
+            ohlcv_row: Dictionary with keys: 'open', 'high', 'low', 'close', 'volume'
+                      Optional: 'date' or datetime column specified in config
+
+        Returns:
+            RSI value for the new row (float in range [0.0, 1.0])
+
+        Raises:
+            ValueError: If required OHLCV keys missing
+            KeyError: If ohlcv_row missing required keys
+
+        Example:
+            >>> indicator = ATRAdaptiveLaguerreRSI(config)
+            >>> # Initialize with historical data
+            >>> rsi_historical = indicator.fit_transform(df_historical)
+            >>> # Process new rows incrementally
+            >>> new_row = {'open': 100, 'high': 101, 'low': 99, 'close': 100.5, 'volume': 1000}
+            >>> new_rsi = indicator.update(new_row)  # O(1) operation
+
+        Note:
+            First call initializes state. Subsequent calls update incrementally.
+            For batch processing, use fit_transform() instead.
+        """
+        # Validate required keys
+        required_keys = ['open', 'high', 'low', 'close', 'volume']
+        missing = set(required_keys) - set(ohlcv_row.keys())
+        if missing:
+            raise ValueError(
+                f"ohlcv_row missing required keys: {missing}\n"
+                f"Available keys: {list(ohlcv_row.keys())}\n"
+                f"Required: {required_keys}"
+            )
+
+        # Initialize state on first call
+        if self._tr_state is None:
+            self._tr_state = TrueRangeState()
+            self._atr_state = ATRState(period=self.config.atr_period)
+            self._laguerre_state = LaguerreFilterState()
+
+        # Extract OHLC values
+        high = float(ohlcv_row['high'])
+        low = float(ohlcv_row['low'])
+        close = float(ohlcv_row['close'])
+
+        # Step 1: Calculate True Range
+        tr = self._tr_state.update(high, low, close)
+
+        # Step 2: Update ATR state
+        atr, min_atr, max_atr = self._atr_state.update(tr)
+
+        # Step 3: Calculate adaptive coefficient
+        adaptive_coeff = calculate_adaptive_coefficient(atr, min_atr, max_atr)
+
+        # Step 4: Calculate adaptive period
+        adaptive_period = calculate_adaptive_period(
+            base_period=float(self.config.atr_period),
+            coefficient=adaptive_coeff,
+            offset=self.config.adaptive_offset,
+        )
+
+        # Step 5: Calculate Laguerre gamma
+        gamma = calculate_gamma(adaptive_period)
+
+        # Step 6: Update Laguerre filter
+        L0, L1, L2, L3 = self._laguerre_state.update(close, gamma)
+
+        # Step 7: Calculate Laguerre RSI
+        rsi = calculate_laguerre_rsi(L0, L1, L2, L3)
+
+        # Store in history for potential rolling statistics
+        self._history.append(ohlcv_row)
+
+        return rsi
 
     def validate_non_anticipative(
         self, df: pd.DataFrame, n_shuffles: int = 100
@@ -384,6 +552,20 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
                 "multiplier_1 and multiplier_2 must both be set or both be None. "
                 f"Got multiplier_1={mult1}, multiplier_2={mult2}"
             )
+
+        # For multi-interval mode, validate sufficient base interval data
+        if mult1 is not None and mult2 is not None:
+            required_bars = self.min_lookback_base_interval
+            if len(df) < required_bars:
+                raise ValueError(
+                    f"Insufficient data for multi-interval mode: {len(df)} rows provided, "
+                    f"{required_bars} required\n"
+                    f"\nConfiguration: atr_period={self.config.atr_period}, "
+                    f"smoothing_period={self.config.smoothing_period}, "
+                    f"multiplier_1={mult1}, multiplier_2={mult2}\n"
+                    f"Hint: Multi-interval processing requires {required_bars} base interval bars "
+                    f"to ensure each resampled interval has sufficient data."
+                )
 
         # Compute base RSI
         rsi_base = self.fit_transform(df)

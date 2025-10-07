@@ -28,14 +28,14 @@ from atr_adaptive_laguerre.features.atr_adaptive_rsi import (
 @pytest.fixture
 def walk_forward_data() -> pd.DataFrame:
     """
-    Generate 1000 bars for walk-forward validation.
+    Generate 1500 bars for walk-forward validation.
 
     Split:
-    - Train: bars 0-599 (60%)
-    - Test: bars 600-999 (40%)
+    - Train: bars 0-899 (60%)
+    - Test: bars 900-1499 (40%)
     """
     np.random.seed(42)
-    n_bars = 1000
+    n_bars = 1500
 
     # Generate realistic OHLCV
     base_price = 100 + np.cumsum(np.random.randn(n_bars) * 0.5)
@@ -186,10 +186,18 @@ class TestWalkForwardValidation:
 
         This test validates that multi-interval features respect train/test boundary.
         """
-        train_end = 600
-
-        config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=3, multiplier_2=12)
+        config = ATRAdaptiveLaguerreRSIConfig(
+            atr_period=14,
+            smoothing_period=5,
+            multiplier_1=3,
+            multiplier_2=12
+        )
         feature = ATRAdaptiveLaguerreRSI(config)
+
+        # Need enough bars for multi-interval
+        min_bars = feature.min_lookback
+        # Ensure train window has enough data AND test window has enough data
+        train_end = max(min_bars, min(600, len(walk_forward_data) - min_bars))
 
         # Extract 121 features on training window
         train_df = walk_forward_data.iloc[:train_end]
@@ -254,8 +262,9 @@ class TestWalkForwardValidation:
         value from t' <= t (never from t' > t).
         """
         # Create simple test case - need enough bars for stats_window (20) + resampling
+        # With multiplier_2=12, need at least 30*12=360 bars
         np.random.seed(42)
-        n_bars = 240  # Divisible by 3 and 12, enough for stats_window
+        n_bars = 400  # Enough for multi-interval with small period config
 
         base_price = 100 + np.cumsum(np.random.randn(n_bars) * 0.5)
         df = pd.DataFrame({
@@ -271,7 +280,7 @@ class TestWalkForwardValidation:
         from atr_adaptive_laguerre.features.feature_expander import FeatureExpander
 
         processor = MultiIntervalProcessor(multiplier_1=3, multiplier_2=12)
-        config = ATRAdaptiveLaguerreRSIConfig()
+        config = ATRAdaptiveLaguerreRSIConfig(atr_period=5, smoothing_period=3)
         feature = ATRAdaptiveLaguerreRSI(config)
         expander = FeatureExpander()
 
@@ -345,15 +354,16 @@ class TestAdversarialEdgeCases:
         # Single bar test window - SHOULD FAIL
         test_df = walk_forward_data.iloc[train_end:train_end + 1]
 
-        with pytest.raises(ValueError, match="rsi length .* must be >= stats_window"):
+        with pytest.raises(ValueError, match="Insufficient data|rsi length .* must be >= stats_window"):
             features_test = feature.fit_transform_features(test_df)
 
-        # Now test with minimum viable window (20 bars for stats_window)
-        test_df_viable = walk_forward_data.iloc[train_end:train_end + 20]
+        # Now test with minimum viable window (need min_lookback bars)
+        min_bars = feature.min_lookback
+        test_df_viable = walk_forward_data.iloc[train_end:train_end + min_bars]
         features_test = feature.fit_transform_features(test_df_viable)
 
-        # Verify 20 rows returned
-        assert len(features_test) == 20
+        # Verify correct rows returned
+        assert len(features_test) == min_bars
 
         # Critical: Features must NOT use any data from training window
         # (This is guaranteed by stateless design - each fit_transform is independent)
@@ -375,12 +385,13 @@ class TestAdversarialEdgeCases:
             "volume": 10000,
         })
 
-        config = ATRAdaptiveLaguerreRSIConfig()
+        config = ATRAdaptiveLaguerreRSIConfig(atr_period=5, smoothing_period=3)
         feature = ATRAdaptiveLaguerreRSI(config)
 
         # Overlapping windows (BAD user practice)
+        min_bars = feature.min_lookback
         train_df = df.iloc[:60]
-        test_df = df.iloc[50:80]  # Overlaps with training!
+        test_df = df.iloc[50:50+min_bars]  # Overlaps with training!
 
         features_train = feature.fit_transform_features(train_df)
         features_test = feature.fit_transform_features(test_df)
