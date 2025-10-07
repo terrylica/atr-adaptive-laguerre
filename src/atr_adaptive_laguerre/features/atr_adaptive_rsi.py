@@ -882,49 +882,37 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             for col in features_mult2_all.columns:
                 result[col + "_mult2"] = np.nan
 
-        # Compute availability time for each resampled bar
-        # A resampled bar's availability = max(availability of all constituent base bars)
-        mult1_availability = []
-        for mult1_idx in range(len(df_mult1_full)):
-            start_idx = mult1_idx * mult1
-            end_idx = min((mult1_idx + 1) * mult1, len(df))
-            if end_idx > start_idx:
-                # Last bar in the window determines availability
-                mult1_availability.append(df[avail_col].iloc[end_idx - 1])
-            else:
-                mult1_availability.append(pd.Timestamp.max)
+        # Vectorized availability mapping using numpy searchsorted (much faster than bisect in loop)
+        base_times = df[avail_col].values
 
-        mult2_availability = []
-        for mult2_idx in range(len(df_mult2_full)):
-            start_idx = mult2_idx * mult2
-            end_idx = min((mult2_idx + 1) * mult2, len(df))
-            if end_idx > start_idx:
-                mult2_availability.append(df[avail_col].iloc[end_idx - 1])
-            else:
-                mult2_availability.append(pd.Timestamp.max)
+        # Compute availability for each resampled bar (vectorized)
+        if features_mult1_all is not None and len(df_mult1_full) > 0:
+            # Vectorized: get availability time for each mult1 bar
+            mult1_end_indices = np.minimum(np.arange(len(df_mult1_full)) * mult1 + mult1, len(df)) - 1
+            mult1_end_indices = np.maximum(mult1_end_indices, 0)  # Ensure non-negative
+            mult1_availability = df[avail_col].iloc[mult1_end_indices].values
 
-        # For each base row, find the most recent available resampled bar (binary search)
-        import bisect
+            # Vectorized searchsorted: find which mult1 bar to use for each base row
+            mult1_indices = np.searchsorted(mult1_availability, base_times, side='right') - 1
+            mult1_indices = np.maximum(mult1_indices, 0)  # Clamp to valid range
+            mult1_indices = np.minimum(mult1_indices, len(features_mult1_all) - 1)
 
-        for idx in range(len(df)):
-            base_time = df[avail_col].iloc[idx]
+            # Vectorized assignment: use numpy indexing then assign to dataframe
+            for col in features_mult1_all.columns:
+                result[col + "_mult1"] = features_mult1_all[col].iloc[mult1_indices].values
 
-            # Find most recent mult1 bar where availability <= base_time
-            if features_mult1_all is not None and len(mult1_availability) > 0:
-                # bisect_right gives us the insertion point; we want the bar just before it
-                insert_pos = bisect.bisect_right(mult1_availability, base_time)
-                if insert_pos > 0:
-                    mult1_idx = insert_pos - 1
-                    for col in features_mult1_all.columns:
-                        result.loc[result.index[idx], col + "_mult1"] = features_mult1_all.iloc[mult1_idx][col]
+        # Same for mult2 (vectorized)
+        if features_mult2_all is not None and len(df_mult2_full) > 0:
+            mult2_end_indices = np.minimum(np.arange(len(df_mult2_full)) * mult2 + mult2, len(df)) - 1
+            mult2_end_indices = np.maximum(mult2_end_indices, 0)
+            mult2_availability = df[avail_col].iloc[mult2_end_indices].values
 
-            # Same for mult2
-            if features_mult2_all is not None and len(mult2_availability) > 0:
-                insert_pos = bisect.bisect_right(mult2_availability, base_time)
-                if insert_pos > 0:
-                    mult2_idx = insert_pos - 1
-                    for col in features_mult2_all.columns:
-                        result.loc[result.index[idx], col + "_mult2"] = features_mult2_all.iloc[mult2_idx][col]
+            mult2_indices = np.searchsorted(mult2_availability, base_times, side='right') - 1
+            mult2_indices = np.maximum(mult2_indices, 0)
+            mult2_indices = np.minimum(mult2_indices, len(features_mult2_all) - 1)
+
+            for col in features_mult2_all.columns:
+                result[col + "_mult2"] = features_mult2_all[col].iloc[mult2_indices].values
 
         # Forward-fill any remaining NaNs (for early rows)
         result = result.ffill()

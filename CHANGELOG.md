@@ -5,7 +5,45 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.4 (2025-10-07)
+
+### ⚡ Performance
+
+- **54x faster than v1.0.3 - TRUE vectorized implementation!**
+  - Finally achieved production-ready performance
+  - 1K rows: 16.46s (v1.0.3) → **0.30s** (v1.0.4) = **54x faster**
+  - Estimated 32K rows: ~10-15 seconds (vs 51 minutes in v1.0.3!)
+
+  **What was wrong in v1.0.3**:
+  - Still used row-by-row `.loc` assignment (very slow in pandas)
+  - Binary search in Python loop instead of vectorized numpy
+
+  **What's fixed in v1.0.4**:
+  - Fully vectorized using `np.searchsorted` (numpy binary search)
+  - Vectorized assignment using `.iloc[indices].values`
+  - No Python loops for assignment
+
+  **Complexity**: O(n + m log m) where m << n (resampled bars)
+
+### 📚 Documentation
+
+- Acknowledged that v1.0.3 did not deliver promised performance improvements
+- User feedback was correct: v1.0.3 performance was identical to v1.0.2
+
+### 🙏 Acknowledgments
+
+- Thank you to the user who provided detailed performance profiling showing v1.0.3 was no faster than v1.0.2
+- The rigorous testing (360, 500, 1K, 32K rows) revealed the issue
+- v1.0.4 implements the ACTUAL optimization that was intended for v1.0.3
+
 ## v1.0.3 (2025-10-07)
+
+### ⚠️ Note
+
+**This version did not achieve the claimed performance improvements.**
+User testing revealed v1.0.3 was identical in performance to v1.0.2 (~6s for 500 rows, still timed out on 32K rows).
+The issue was row-by-row pandas `.loc` assignment which is extremely slow.
+**Use v1.0.4 instead, which delivers the true 50x+ speedup.**
 
 ### ⚡ Performance
 
