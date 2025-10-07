@@ -86,6 +86,10 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         default="date",
         description="Name of datetime column (or use datetime index if None)",
     )
+    filter_redundancy: bool = Field(
+        default=True,
+        description="Apply redundancy filtering (reduces 121→79 features, |ρ|>0.9 removed)",
+    )
 
     @field_validator("level_down")
     @classmethod
@@ -152,16 +156,20 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         atr_period: int = 14,
         smoothing_period: int = 5,
         date_column: str = "date",
+        filter_redundancy: bool = True,
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create multi-interval configuration (121 features).
+        Create multi-interval configuration (79 features by default).
 
         Features:
         - Base interval (27): All single-interval features with _base suffix
         - Multiplier 1 (27): Features at {multiplier_1}× timeframe with _mult1 suffix
         - Multiplier 2 (27): Features at {multiplier_2}× timeframe with _mult2 suffix
         - Cross-interval (40): Regime alignment, divergence, momentum patterns
+
+        Default: Redundancy filtering enabled (removes 42 features with |ρ| > 0.9, outputs 79 features).
+        Set filter_redundancy=False to get all 121 features.
 
         Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
 
@@ -171,20 +179,29 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             atr_period: ATR lookback period (default: 14)
             smoothing_period: Price smoothing period (default: 5)
             date_column: Name of datetime column (default: 'date')
+            filter_redundancy: Apply redundancy filtering (default: True, outputs 79 features)
             **kwargs: Additional config parameters
 
         Returns:
-            Config for 121-feature output
+            Config for 79-feature output (or 121 if filter_redundancy=False)
 
         Example:
-            >>> # For 1h base data: generates features at 1h, 4h, 12h intervals
+            >>> # Default: redundancy filtering enabled (79 features)
             >>> config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,  # 4h
             ...     multiplier_2=12  # 12h
             ... )
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 121
-            >>> indicator.min_lookback  # 360
+            >>> indicator.n_features  # 79
+
+            >>> # Disable filtering to get all 121 features
+            >>> config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+            ...     multiplier_1=4,
+            ...     multiplier_2=12,
+            ...     filter_redundancy=False
+            ... )
+            >>> indicator_unfiltered = ATRAdaptiveLaguerreRSI(config_unfiltered)
+            >>> indicator_unfiltered.n_features  # 121
         """
         return cls(
             atr_period=atr_period,
@@ -192,6 +209,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             multiplier_1=multiplier_1,
             multiplier_2=multiplier_2,
             date_column=date_column,
+            filter_redundancy=filter_redundancy,
             **kwargs
         )
 
@@ -429,6 +447,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         Returns:
             27 for single-interval mode
             121 for multi-interval mode (27×3 intervals + 40 cross-interval)
+            79 for multi-interval with filter_redundancy=True (removes 42 features)
 
         Example:
             >>> config = ATRAdaptiveLaguerreRSIConfig()
@@ -438,9 +457,21 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             >>> config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=4, multiplier_2=12)
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
             >>> indicator.n_features  # 121
+
+            >>> config_filtered = ATRAdaptiveLaguerreRSIConfig(
+            ...     multiplier_1=4, multiplier_2=12, filter_redundancy=True
+            ... )
+            >>> indicator_filtered = ATRAdaptiveLaguerreRSI(config_filtered)
+            >>> indicator_filtered.n_features  # 79
         """
         if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
-            return 121  # Multi-interval: 27×3 + 40 cross-interval
+            # Multi-interval: 27×3 + 40 cross-interval = 121
+            # With redundancy filtering: 121 - 42 = 79
+            base_count = 121
+            if self.config.filter_redundancy:
+                from .redundancy_filter import RedundancyFilter
+                return RedundancyFilter.n_features_after_filtering(base_count)
+            return base_count
         return 27  # Single-interval
 
     @property
@@ -738,5 +769,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # Combine all features: 81 interval features + 40 interactions = 121
         features_final = pd.concat([features_all_intervals, interactions], axis=1)
+
+        # Apply redundancy filtering if enabled (121 → 79)
+        if self.config.filter_redundancy:
+            from .redundancy_filter import RedundancyFilter
+            features_final = RedundancyFilter.filter(features_final, apply_filter=True)
 
         return features_final

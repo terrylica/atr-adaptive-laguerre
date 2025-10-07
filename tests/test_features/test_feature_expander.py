@@ -493,8 +493,13 @@ class TestFullFeaturePipeline:
         3. Output shape is correct (121 columns)
         """
         # Configure multi-interval extraction with smaller periods to fit in sample data
+        # Explicitly disable filtering to test all 121 features
         config = ATRAdaptiveLaguerreRSIConfig(
-            atr_period=14, smoothing_period=5, multiplier_1=3, multiplier_2=12
+            atr_period=14,
+            smoothing_period=5,
+            multiplier_1=3,
+            multiplier_2=12,
+            filter_redundancy=False,
         )
         feature = ATRAdaptiveLaguerreRSI(config)
 

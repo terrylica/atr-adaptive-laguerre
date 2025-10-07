@@ -30,3 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Correct GitHub organization name in documentation links (v0.1.2) - Updated README links from eonlabs to Eon-Labs - Updated pyproject.toml repository URLs - Bumped version to 0.1.2
 
+
+---
+*Full changelog: [CHANGELOG.md](https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/v1.0.0/CHANGELOG.md)*

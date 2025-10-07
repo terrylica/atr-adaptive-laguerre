@@ -1,0 +1,243 @@
+openapi: 3.1.0
+info:
+  title: Redundancy Filter Specification
+  description: Feature redundancy filtering (121→79 features, |ρ|>0.9 removed)
+  version: 1.1.0
+  x-changelog:
+    - version: 1.1.0
+      date: 2025-10-07
+      changes:
+        - "BREAKING: Changed default filter_redundancy from False to True"
+        - Default behavior now outputs 79 features (was 121)
+        - IC validation passed: +45.54% improvement, -0.52% |IC| change
+        - Migration: Set filter_redundancy=False to restore v0.2.x behavior (121 features)
+    - version: 1.0.0
+      date: 2025-10-07
+      changes:
+        - Implemented optional redundancy filtering in ATRAdaptiveLaguerreRSI
+        - Based on correlation analysis: 3yr 2h OHLCV data (BTC/ETH/SOL)
+        - 42 features dropped (|ρ| > 0.9 threshold)
+        - Initially backward compatible (filter_redundancy=False by default)
+
+components:
+  schemas:
+    FilterConfiguration:
+      type: object
+      description: Configuration for applying redundancy filter
+      properties:
+        enabled:
+          type: boolean
+          example: true
+          description: "Apply redundancy filtering (default True, outputs 79 features)"
+        threshold_rationale:
+          type: string
+          example: "|ρ| > 0.9 (auto-drop), 0.7 < |ρ| ≤ 0.9 (manual review)"
+
+    AnalysisMetadata:
+      type: object
+      description: Source analysis metadata for redundancy determination
+      properties:
+        data_specification:
+          type: object
+          properties:
+            symbols:
+              type: array
+              items:
+                type: string
+              example: ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+            interval:
+              type: string
+              example: "2h"
+            date_range:
+              type: string
+              example: "2022-10-01 to 2025-09-30"
+            n_rows_per_symbol:
+              type: integer
+              example: 13152
+        correlation_methodology:
+          type: string
+          example: "Spearman correlation (handles non-linear RSI transformations)"
+        clustering_methodology:
+          type: string
+          example: "Hierarchical clustering with Ward linkage, distance threshold 0.3"
+        redundancy_findings:
+          type: object
+          properties:
+            total_pairs_above_0.7:
+              type: integer
+              example: 686
+            drop_pairs_above_0.9:
+              type: integer
+              example: 220
+            unique_features_to_drop:
+              type: integer
+              example: 42
+            reduction_percentage:
+              type: number
+              example: 34.7
+
+    RedundantFeatures:
+      type: object
+      description: 42 features flagged for removal
+      properties:
+        constant_features:
+          type: array
+          items:
+            type: string
+          example:
+            - "all_intervals_neutral"
+          description: "Features with zero variance (constant value across all rows)"
+
+        perfect_correlations:
+          type: array
+          description: "Features with |ρ| = 1.0 (algebraically redundant)"
+          items:
+            type: object
+          example:
+            - feature: "dist_midline_base"
+              correlation: 1.0
+              keep_instead: "rsi_base"
+              reason: "dist_midline = rsi - 0.5 (perfect linear transform)"
+            - feature: "dist_overbought_base"
+              correlation: 1.0
+              keep_instead: "dist_oversold_base"
+              reason: "dist_overbought = -(dist_oversold + constant)"
+
+        high_correlations:
+          type: array
+          description: "Features with 0.9 < |ρ| < 1.0"
+          items:
+            type: object
+          example:
+            - feature: "rsi_velocity_base"
+              correlation: 0.95
+              keep_instead: "rsi_change_1_base"
+              reason: "Velocity is EMA-smoothed version of change_1"
+            - feature: "regime_strength_base"
+              correlation: 0.97
+              keep_instead: "regime_base"
+              reason: "Strength derived from regime classification"
+
+        complete_feature_list:
+          type: array
+          description: "All 42 redundant features (alphabetically sorted)"
+          items:
+            type: string
+          example:
+            - all_intervals_neutral
+            - bars_since_overbought_mult1
+            - bars_since_oversold_mult2
+            - cross_above_oversold_mult2
+            - dist_midline_base
+            - dist_midline_mult1
+            - dist_midline_mult2
+            - dist_overbought_base
+            - dist_overbought_mult1
+            - dist_overbought_mult2
+            - dist_oversold_base
+            - dist_oversold_mult1
+            - dist_oversold_mult2
+            - higher_crossed_first
+            - momentum_direction
+            - regime_base
+            - regime_bullish_mult1
+            - regime_change_cascade
+            - regime_changed_base
+            - regime_changed_mult2
+            - regime_mult1
+            - regime_neutral_base
+            - regime_neutral_mult1
+            - regime_persistence_ratio
+            - regime_strength_base
+            - regime_strength_mult1
+            - regime_strength_mult2
+            - regime_transition_pattern
+            - regime_unanimity
+            - rsi_base
+            - rsi_mult1
+            - rsi_mult2
+            - rsi_percentile_20_mult1
+            - rsi_range_across_intervals
+            - rsi_skew_across_intervals
+            - rsi_spread_base_mult2
+            - rsi_spread_mult1_mult2
+            - rsi_velocity_base
+            - rsi_velocity_mult1
+            - rsi_volatility_20_base
+            - rsi_zscore_20_base
+            - rsi_zscore_20_mult1
+
+    ImplementationDetails:
+      type: object
+      description: Code integration details
+      properties:
+        module:
+          type: string
+          example: "atr_adaptive_laguerre.features.redundancy_filter.RedundancyFilter"
+        config_field:
+          type: string
+          example: "ATRAdaptiveLaguerreRSIConfig.filter_redundancy (bool, default=True)"
+        backward_compatibility:
+          type: string
+          example: "BREAKING: Filter enabled by default (v0.3.0) - set filter_redundancy=False to restore v0.2.x behavior"
+        usage_example:
+          type: string
+          example: |
+            # Default: filtering enabled (79 features)
+            config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+                multiplier_1=4,
+                multiplier_2=12
+            )
+            indicator = ATRAdaptiveLaguerreRSI(config)
+            features = indicator.fit_transform_features(df_ohlcv)
+            print(features.shape)  # (n_bars, 79)
+
+            # To get all 121 features (disable filtering)
+            config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+                multiplier_1=4,
+                multiplier_2=12,
+                filter_redundancy=False  # Disables filtering
+            )
+            indicator_unfiltered = ATRAdaptiveLaguerreRSI(config_unfiltered)
+            features_unfiltered = indicator_unfiltered.fit_transform_features(df_ohlcv)
+            print(features_unfiltered.shape)  # (n_bars, 121)
+
+    ValidationCriteria:
+      type: object
+      description: IC validation requirements before production use
+      properties:
+        ic_delta_threshold:
+          type: number
+          example: -5.0
+          description: "IC must not degrade by more than 5% after filtering"
+        test_methodology:
+          type: string
+          example: "Compare IC on full 121 features vs filtered 79 features on out-of-sample data"
+        pass_criteria:
+          type: string
+          example: "ic_delta_pct > -5.0% AND downstream model performance maintained"
+
+    ReferenceFiles:
+      type: object
+      description: Analysis outputs and source files
+      properties:
+        correlation_analysis:
+          type: string
+          example: "/tmp/redundancy_analysis.py"
+        edge_list:
+          type: string
+          example: "/tmp/feature_correlations_edgelist.csv"
+        cluster_assignments:
+          type: string
+          example: "/tmp/feature_clusters.csv"
+        decision_table:
+          type: string
+          example: "/tmp/redundancy_decisions.csv"
+        graph_metrics:
+          type: string
+          example: "/tmp/graph_metrics.json"
+        analysis_metadata:
+          type: string
+          example: "/tmp/redundancy_analysis_metadata.json"
+
+paths: {}
