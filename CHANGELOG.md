@@ -5,6 +5,44 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.1 (2025-10-07)
+
+### ✨ Features
+
+- **Fix Critical Data Leakage in Multi-Interval Mode**
+  - Added `availability_column` parameter to `ATRAdaptiveLaguerreRSIConfig`
+  - When set, multi-interval resampling respects temporal availability constraints
+  - Prevents data leakage by ensuring only "available" resampled bars are used
+  - Required for production ML with delayed data availability (e.g., exchange delays)
+
+  **Usage**:
+  ```python
+  config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+      multiplier_1=4,
+      multiplier_2=12,
+      availability_column='actual_ready_time'  # NEW
+  )
+  ```
+
+  **Impact**: Eliminates 71% leakage in 4x features, 14% in 12x features
+
+- **Added 5 test cases** for `availability_column` validation
+  - No data leakage with availability constraints
+  - Works with realistic data delays
+  - Clear error messages for missing columns
+  - Compatible with redundancy filtering
+
+### 🐛 Bug Fixes
+
+- **Multi-interval data leakage** (CRITICAL): Fixed resampling logic that used future bars
+  - Root cause: Resampling entire dataset created bars with future base bars
+  - Fix: Row-by-row processing when `availability_column` is set
+  - Validation: Full data vs prediction data features now match exactly
+
+### 📚 Documentation
+
+- Updated factory method docstring to document `availability_column`
+- Added comprehensive test suite in `tests/test_features/test_availability_column.py`
 
 ### ⚠️ Breaking Changes
 

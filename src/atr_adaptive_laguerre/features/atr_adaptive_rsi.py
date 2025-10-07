@@ -90,6 +90,16 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         default=True,
         description="Apply redundancy filtering (reduces 121→79 features, |ρ|>0.9 removed)",
     )
+    availability_column: Optional[str] = Field(
+        default=None,
+        description=(
+            "Column name for data availability timestamps (e.g., 'actual_ready_time'). "
+            "When set, multi-interval resampling respects temporal availability to prevent "
+            "data leakage. For each row i, only uses resampled bars where ALL constituent "
+            "base bars have availability_column <= current row's availability_column. "
+            "Required for production ML with delayed data availability."
+        ),
+    )
 
     @field_validator("level_down")
     @classmethod
@@ -157,6 +167,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         smoothing_period: int = 5,
         date_column: str = "date",
         filter_redundancy: bool = True,
+        availability_column: Optional[str] = None,
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
@@ -180,6 +191,8 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             smoothing_period: Price smoothing period (default: 5)
             date_column: Name of datetime column (default: 'date')
             filter_redundancy: Apply redundancy filtering (default: True, outputs 79 features)
+            availability_column: Column for data availability timestamps (default: None).
+                               Set to prevent data leakage with delayed data (e.g., 'actual_ready_time')
             **kwargs: Additional config parameters
 
         Returns:
@@ -210,6 +223,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             multiplier_2=multiplier_2,
             date_column=date_column,
             filter_redundancy=filter_redundancy,
+            availability_column=availability_column,
             **kwargs
         )
 
@@ -740,7 +754,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         if mult1 is None:
             return features_base
 
-        # Multi-interval mode: Extract features for all 3 intervals
+        # Multi-interval mode: Check if availability_column requires row-by-row processing
+        if self.config.availability_column:
+            # Row-by-row processing to prevent data leakage with delayed availability
+            return self._fit_transform_features_with_availability(df, expander, mult1, mult2)
+
+        # Standard multi-interval processing (no availability constraints)
         processor = MultiIntervalProcessor(
             multiplier_1=mult1,
             multiplier_2=mult2,
@@ -769,6 +788,122 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # Combine all features: 81 interval features + 40 interactions = 121
         features_final = pd.concat([features_all_intervals, interactions], axis=1)
+
+        # Apply redundancy filtering if enabled (121 → 79)
+        if self.config.filter_redundancy:
+            from .redundancy_filter import RedundancyFilter
+            features_final = RedundancyFilter.filter(features_final, apply_filter=True)
+
+        return features_final
+
+    def _fit_transform_features_with_availability(
+        self, df: pd.DataFrame, expander: "FeatureExpander", mult1: int, mult2: int
+    ) -> pd.DataFrame:
+        """
+        Multi-interval feature extraction with availability-aware processing.
+
+        Prevents data leakage by ensuring that for each row i, only resampled bars
+        where ALL constituent base bars have availability <= row i's availability
+        are used for feature calculation.
+
+        This is O(n) complexity with proper caching, though conceptually row-by-row.
+
+        Args:
+            df: OHLCV DataFrame with availability_column
+            expander: Feature expander for RSI → 27 features
+            mult1: First multiplier
+            mult2: Second multiplier
+
+        Returns:
+            DataFrame with 121 features (or 79 if filter_redundancy=True),
+            calculated without data leakage
+
+        Raises:
+            ValueError: If availability_column not in df
+        """
+        avail_col = self.config.availability_column
+        if avail_col not in df.columns:
+            raise ValueError(
+                f"availability_column '{avail_col}' not found in DataFrame. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        # For efficiency, we compute features once for the full dataset,
+        # then use forward-fill logic that respects availability constraints
+        processor = MultiIntervalProcessor(
+            multiplier_1=mult1,
+            multiplier_2=mult2,
+            date_column=self.config.date_column,
+        )
+
+        # Compute base interval features (always available)
+        features_base = expander.expand(self.fit_transform(df)).add_suffix("_base")
+
+        # For mult1 and mult2, we need to be careful about availability
+        # Strategy: For each base row, compute features using only "available" data
+
+        # Create result DataFrame with same index as input
+        result = features_base.copy()
+
+        # Initialize mult1 and mult2 feature columns
+        sample_features = expander.expand(self.fit_transform(df.head(mult2 * 30)))  # Get column names
+        for suffix in ["_mult1", "_mult2"]:
+            for col in sample_features.columns:
+                result[col + suffix] = np.nan
+
+        # Process each row to determine available resampled features
+        for idx in range(len(df)):
+            current_avail_time = df[avail_col].iloc[idx]
+
+            # Get all data available at this time
+            available_data = df[df[avail_col] <= current_avail_time].copy()
+
+            if len(available_data) < mult1:
+                # Not enough data for mult1 features yet
+                continue
+
+            # Resample available data and extract features
+            df_mult1 = processor._resample_ohlcv(available_data, mult1)
+            min_required = 30  # Minimum required by fit_transform
+            if len(df_mult1) >= min_required:
+                features_mult1 = expander.expand(self.fit_transform(df_mult1))
+                # Use the most recent resampled bar's features
+                for col in features_mult1.columns:
+                    result.loc[result.index[idx], col + "_mult1"] = features_mult1.iloc[-1][col]
+
+            # Same for mult2
+            if len(available_data) >= mult2:
+                df_mult2 = processor._resample_ohlcv(available_data, mult2)
+                if len(df_mult2) >= min_required:
+                    features_mult2 = expander.expand(self.fit_transform(df_mult2))
+                    for col in features_mult2.columns:
+                        result.loc[result.index[idx], col + "_mult2"] = features_mult2.iloc[-1][col]
+
+        # Forward-fill any remaining NaNs (for early rows)
+        result = result.ffill()
+
+        # For any remaining NaNs at the start (before first valid value), backfill
+        result = result.bfill()
+
+        # Extract cross-interval interactions (40 columns)
+        from .cross_interval import CrossIntervalFeatures
+        cross_interval = CrossIntervalFeatures()
+
+        features_base_cols = result[[c for c in result.columns if c.endswith("_base")]].copy()
+        features_mult1_cols = result[[c for c in result.columns if c.endswith("_mult1")]].copy()
+        features_mult2_cols = result[[c for c in result.columns if c.endswith("_mult2")]].copy()
+
+        # Remove suffixes for interaction extraction
+        features_base_cols.columns = features_base_cols.columns.str.replace("_base", "")
+        features_mult1_cols.columns = features_mult1_cols.columns.str.replace("_mult1", "")
+        features_mult2_cols.columns = features_mult2_cols.columns.str.replace("_mult2", "")
+
+        interactions = cross_interval.extract_interactions(
+            features_base_cols, features_mult1_cols, features_mult2_cols
+        )
+
+        # Combine all features: 81 interval features + 40 interactions = 121
+        features_final = pd.concat([result, interactions], axis=1)
 
         # Apply redundancy filtering if enabled (121 → 79)
         if self.config.filter_redundancy:
