@@ -5,6 +5,37 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.6 (2025-10-07)
+
+### 🎯 UX Improvements
+
+- **Added runtime warning for single-interval mode** (CRITICAL UX IMPROVEMENT)
+  - Users now warned when using default config (27 features)
+  - Clear guidance to use `.multi_interval()` for 79 features
+  - Warning explains missing 31 cross-interval analysis features
+  - Prevents users from unknowingly missing powerful features
+
+  **Impact**: Helps users discover multi-interval mode (79 features) instead of getting only single-interval mode (27 features)
+
+- **Reorganized README to prominently feature multi-interval mode**
+  - Multi-interval mode (79 features) now shown first as recommended
+  - Added "Feature Modes" comparison table
+  - Clear explanation of 31 cross-interval features
+  - Single-interval mode clearly marked as "minimal lookback" use case
+
+### 📚 Documentation
+
+- Added feature mode comparison section to README
+- Clarified that multi-interval mode is recommended for ML pipelines
+- Listed cross-interval features: regime alignment, divergence detection, momentum cascades
+- Reorganized Quick Start to show multi-interval first
+
+### 🙏 Acknowledgments
+
+- Thank you to Eon Labs ML Feature Engineering team for identifying this critical UX issue
+- The feedback revealed that users were unknowingly missing 52 powerful features (79 total vs 27)
+- Multi-interval mode includes 31 cross-interval analysis features unavailable in single-interval mode
+
 ## v1.0.5 (2025-10-07)
 
 ### 🐛 Critical Bug Fix

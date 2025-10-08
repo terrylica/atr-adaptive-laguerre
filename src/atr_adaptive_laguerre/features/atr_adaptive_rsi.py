@@ -20,6 +20,7 @@ MQL5 Reference:
 """
 
 from typing import Literal, Optional
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -273,6 +274,19 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             config = ATRAdaptiveLaguerreRSIConfig()
         super().__init__(config)
         self.config: ATRAdaptiveLaguerreRSIConfig = config
+
+        # Warn users if they're using single-interval mode (27 features)
+        # Multi-interval mode (79 features) includes 31 powerful cross-interval analysis features
+        if self.config.multiplier_1 is None or self.config.multiplier_2 is None:
+            warnings.warn(
+                "Using single-interval mode (27 features). "
+                "For multi-timeframe analysis with 79 features including 31 cross-interval "
+                "features (regime alignment, divergence detection, momentum cascades), "
+                "use: ATRAdaptiveLaguerreRSIConfig.multi_interval(). "
+                "See docs for feature comparison.",
+                UserWarning,
+                stacklevel=2
+            )
 
         # Initialize stateful components for incremental updates
         self._tr_state: Optional[TrueRangeState] = None

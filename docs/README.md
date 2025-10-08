@@ -27,15 +27,59 @@ This library implements the ATR-Adaptive Laguerre RSI indicator, designed for ro
 uv add atr-adaptive-laguerre
 ```
 
+## Feature Modes: Choose Your Use Case
+
+This package supports two operational modes with very different capabilities:
+
+| Mode | Features | Lookback | Use Case |
+|------|----------|----------|----------|
+| **Multi-Interval** (Recommended) | **79** | 360 bars | Production ML pipelines - includes cross-timeframe analysis |
+| **Single-Interval** | 27 | 30 bars | Minimal data requirements or single-timeframe analysis |
+
+### ⚠️ Important: Multi-Interval Mode is Recommended
+
+**If you're building ML features, you want multi-interval mode (79 features)**, which includes:
+- Base interval features (16)
+- First multiplier interval features (15)
+- Second multiplier interval features (17)
+- **Cross-interval analysis features (31)** ← Unique to multi-interval mode!
+
+Cross-interval features detect multi-timeframe patterns like:
+- Regime alignment across timeframes
+- Divergence detection
+- Momentum cascades
+- Gradient analysis
+- Statistical stability metrics
+
 ## Quick Start
 
-### Basic Usage (Single RSI Value)
+### Multi-Interval Mode (Recommended - 79 Features)
 
 ```python
 from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRAdaptiveLaguerreRSIConfig
-import pandas as pd
 
-# Create indicator with flexible datetime support
+# RECOMMENDED: Use multi-interval mode for full feature set
+config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
+    multiplier_1=4,   # 4x base interval (e.g., 2h → 8h)
+    multiplier_2=12   # 12x base interval (e.g., 2h → 24h)
+)
+indicator = ATRAdaptiveLaguerreRSI(config)
+
+# Extract 79 features across 3 timeframes
+features_df = indicator.fit_transform_features(df)
+
+print(f"Features extracted: {indicator.n_features}")  # 79
+print(f"Min data required: {indicator.min_lookback_base_interval} bars")  # 360
+```
+
+### Single-Interval Mode (Minimal Lookback - 27 Features)
+
+Use this mode only if you have limited historical data or need single-timeframe analysis:
+
+```python
+from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRAdaptiveLaguerreRSIConfig
+
+# Single-interval mode (WARNING: only 27 features, missing cross-timeframe analysis)
 config = ATRAdaptiveLaguerreRSIConfig(
     atr_period=14,
     smoothing_period=5,
@@ -43,39 +87,24 @@ config = ATRAdaptiveLaguerreRSIConfig(
 )
 indicator = ATRAdaptiveLaguerreRSI(config)
 
-# Batch processing
-rsi_series = indicator.fit_transform(df)  # Returns pd.Series
+# Get single RSI value
+rsi_series = indicator.fit_transform(df)  # Returns pd.Series (single RSI column)
 
-# Incremental updates (O(1) streaming)
-new_row = {'open': 100, 'high': 101, 'low': 99, 'close': 100.5, 'volume': 1000}
-new_rsi = indicator.update(new_row)  # Returns float
+# Or get 27 single-interval features
+features_df = indicator.fit_transform_features(df)  # Returns DataFrame with 27 columns
+
+print(f"Features extracted: {indicator.n_features}")  # 27
+print(f"Min data required: {indicator.min_lookback} bars")  # 30
 ```
 
-### Multi-Interval Feature Extraction (79 Features by Default)
+### Advanced: Incremental Updates (O(1) Streaming)
+
+Both modes support efficient incremental updates:
 
 ```python
-# Extract features across 3 intervals (5m, 15m, 1h example)
-# Default: Redundancy filtering enabled (79 features)
-config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
-    multiplier_1=3,   # 15m features (5m × 3)
-    multiplier_2=12   # 1h features (5m × 12)
-)
-feature = ATRAdaptiveLaguerreRSI(config)
-
-# Returns DataFrame with 79 columns (42 redundant features removed):
-# - Base, mult1, mult2 interval features (reduced from 81 to 47)
-# - Cross-interval interactions (reduced from 40 to 32)
-features_df = feature.fit_transform_features(df)
-
-# Check minimum required data
-print(f"Need {feature.min_lookback_base_interval} bars for multi-interval")
-
-# To get all 121 features (no filtering):
-config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
-    multiplier_1=3,
-    multiplier_2=12,
-    filter_redundancy=False  # Disable redundancy filtering
-)
+# After initial fit_transform
+new_row = {'open': 100, 'high': 101, 'low': 99, 'close': 100.5, 'volume': 1000}
+new_rsi = indicator.update(new_row)  # Returns float (O(1) complexity)
 ```
 
 ### Disabling Redundancy Filtering (79 → 121 Features)
