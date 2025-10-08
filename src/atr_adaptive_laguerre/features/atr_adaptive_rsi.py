@@ -901,9 +901,16 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # Compute availability for each resampled bar (vectorized)
         if features_mult1_all is not None and len(df_mult1_full) > 0:
-            # Vectorized: get availability time for each mult1 bar
-            mult1_end_indices = np.minimum(np.arange(len(df_mult1_full)) * mult1 + mult1, len(df)) - 1
-            mult1_end_indices = np.maximum(mult1_end_indices, 0)  # Ensure non-negative
+            # Map mult1 bars to base bars using timestamps (handles sliced/reset DataFrames)
+            base_freq = df["date"].iloc[1] - df["date"].iloc[0]
+
+            # For each mult1 bar, find the last base bar in its time window
+            # Window contains mult1 bars, so last bar is at start + (mult1-1)*base_freq
+            mult1_end_times = df_mult1_full["date"].values + (mult1 - 1) * base_freq
+            # Use searchsorted to find base bar with this exact timestamp (or closest)
+            mult1_end_indices = np.searchsorted(df["date"].values, mult1_end_times, side='right') - 1
+            mult1_end_indices = np.maximum(mult1_end_indices, 0)  # Clamp to valid range
+            mult1_end_indices = np.minimum(mult1_end_indices, len(df) - 1)
             mult1_availability = df[avail_col].iloc[mult1_end_indices].values
 
             # Vectorized searchsorted: find which mult1 bar to use for each base row
@@ -919,8 +926,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         # Same for mult2 (vectorized)
         if features_mult2_all is not None and len(df_mult2_full) > 0:
-            mult2_end_indices = np.minimum(np.arange(len(df_mult2_full)) * mult2 + mult2, len(df)) - 1
+            # Map mult2 bars to base bars using timestamps (handles sliced/reset DataFrames)
+            # Window contains mult2 bars, so last bar is at start + (mult2-1)*base_freq
+            mult2_end_times = df_mult2_full["date"].values + (mult2 - 1) * base_freq
+            mult2_end_indices = np.searchsorted(df["date"].values, mult2_end_times, side='right') - 1
             mult2_end_indices = np.maximum(mult2_end_indices, 0)
+            mult2_end_indices = np.minimum(mult2_end_indices, len(df) - 1)
             mult2_availability = df[avail_col].iloc[mult2_end_indices].values
 
             # Use 'left' to ensure strict inequality (availability < base_time)

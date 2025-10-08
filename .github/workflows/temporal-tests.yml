@@ -1,0 +1,71 @@
+name: Temporal Leakage Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/atr_adaptive_laguerre/**'
+      - 'tests/test_temporal/**'
+      - '.github/workflows/temporal-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/atr_adaptive_laguerre/**'
+      - 'tests/test_temporal/**'
+      - '.github/workflows/temporal-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  temporal-regression:
+    name: Temporal Leakage Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Run temporal leakage regression tests
+        run: |
+          uv run --active python -m pytest tests/test_temporal/test_adversarial_regression.py -v --tb=short
+        timeout-minutes: 8
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporal-test-results-${{ matrix.python-version }}
+          path: |
+            .pytest_cache/
+            tests/test_temporal/
+          retention-days: 7
+
+      - name: Report test summary
+        if: always()
+        run: |
+          echo "### Temporal Leakage Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Python: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ All temporal leakage tests passed" >> $GITHUB_STEP_SUMMARY
+            echo "- v1.0.4 boundary bug regression: BLOCKED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Temporal leakage tests failed" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ WARNING: Potential data leakage detected" >> $GITHUB_STEP_SUMMARY
+          fi

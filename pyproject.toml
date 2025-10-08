@@ -40,6 +40,7 @@ dev = [
     "pytest-cov>=4.1",
     "mypy>=1.8",
     "ruff>=0.3",
+    "hypothesis>=6.0",
 ]
 
 [project.urls]
@@ -69,3 +70,12 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --cov=atr_adaptive_laguerre --cov-report=term-missing"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.hypothesis]
+max_examples = 100
+deadline = 10000
+derandomize = false
+verbosity = "normal"
