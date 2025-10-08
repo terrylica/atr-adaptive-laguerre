@@ -106,11 +106,11 @@ class RedundancyFilter:
         Remove redundant features from DataFrame.
 
         Args:
-            df: Feature DataFrame (typically 121 columns in multi-interval mode)
+            df: Feature DataFrame (typically 139 columns in multi-interval mode)
             apply_filter: If True, drop redundant features; if False, return df unchanged
 
         Returns:
-            DataFrame with redundant features removed (73 columns if filtered from 121)
+            DataFrame with redundant features removed (91 columns if filtered from 139)
             If apply_filter=False, returns df unchanged
 
         Raises:
@@ -160,25 +160,30 @@ class RedundancyFilter:
         Calculate expected feature count after filtering.
 
         Args:
-            n_features_before: Original feature count (27 or 121)
+            n_features_before: Original feature count (27, 33, 121, or 139)
 
         Returns:
             Feature count after filtering:
-            - 27 → 27 (no filtering in single-interval mode)
-            - 121 → 73 (removes 48 redundant features)
+            - 27 → 27 (legacy single-interval mode, no filtering)
+            - 33 → 33 (single-interval with tail risk, no filtering)
+            - 121 → 73 (legacy multi-interval, removes 48 redundant features)
+            - 139 → 91 (multi-interval with tail risk, removes 48 redundant features)
 
         Example:
-            >>> RedundancyFilter.n_features_after_filtering(121)
-            73
-            >>> RedundancyFilter.n_features_after_filtering(27)
-            27
+            >>> RedundancyFilter.n_features_after_filtering(139)
+            91
+            >>> RedundancyFilter.n_features_after_filtering(33)
+            33
         """
-        if n_features_before == 27:
+        if n_features_before in (27, 33):
             # Single-interval mode - no cross-interval features to filter
-            return 27
+            return n_features_before
         elif n_features_before == 121:
-            # Multi-interval mode - remove 48 redundant features
+            # Legacy multi-interval mode - remove 48 redundant features
             return 73
+        elif n_features_before == 139:
+            # Multi-interval with tail risk - remove 48 redundant features
+            return 91
         else:
             # Unknown mode - return as-is
             # (May occur if custom feature selection already applied)

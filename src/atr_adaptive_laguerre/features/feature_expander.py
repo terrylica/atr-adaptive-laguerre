@@ -20,7 +20,7 @@ import pandas as pd
 
 class FeatureExpander:
     """
-    Expand single RSI column to 27 feature columns.
+    Expand single RSI column to 33 feature columns.
 
     Categories:
     1. Base indicator (1): rsi
@@ -30,6 +30,7 @@ class FeatureExpander:
     5. Temporal (3): time since extreme events
     6. Rate of change (3): momentum derivatives
     7. Statistics (4): rolling window statistics
+    8. Tail risk (6): black swan event detectors
 
     Non-anticipative guarantee: All features[t] use only rsi[0:t].
     """
@@ -74,13 +75,13 @@ class FeatureExpander:
 
     def expand(self, rsi: pd.Series) -> pd.DataFrame:
         """
-        Expand RSI to 27 feature columns.
+        Expand RSI to 33 feature columns.
 
         Args:
             rsi: RSI values (must be pd.Series with float values in [0, 1])
 
         Returns:
-            DataFrame with 27 columns:
+            DataFrame with 33 columns:
             - rsi (base)
             - regime, regime_bearish, regime_neutral, regime_bullish,
               regime_changed, bars_in_regime, regime_strength (7)
@@ -93,6 +94,8 @@ class FeatureExpander:
             - rsi_change_1, rsi_change_5, rsi_velocity (3)
             - rsi_percentile_20, rsi_zscore_20, rsi_volatility_20,
               rsi_range_20 (4)
+            - rsi_shock_1bar, rsi_shock_5bar, extreme_regime_persistence,
+              rsi_volatility_spike, rsi_acceleration, tail_risk_score (6)
 
         Raises:
             ValueError: If rsi not pd.Series
@@ -121,6 +124,9 @@ class FeatureExpander:
         roc = self._extract_roc(rsi)
         statistics = self._extract_statistics(rsi)
 
+        # Extract tail risk features (requires previously extracted features)
+        tail_risk = self._extract_tail_risk(rsi, regimes, roc, statistics)
+
         # Combine all features
         features = pd.concat(
             [
@@ -131,6 +137,7 @@ class FeatureExpander:
                 temporal,
                 roc,
                 statistics,
+                tail_risk,
             ],
             axis=1,
         )
@@ -367,5 +374,82 @@ class FeatureExpander:
                 "rsi_zscore_20": rsi_zscore_20,
                 "rsi_volatility_20": rsi_volatility_20,
                 "rsi_range_20": rsi_range_20,
+            }
+        )
+
+    def _extract_tail_risk(
+        self,
+        rsi: pd.Series,
+        regimes: pd.DataFrame,
+        roc: pd.DataFrame,
+        statistics: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Extract 6 tail risk / black swan detection features.
+
+        Detects extreme market conditions and volatility spikes that may
+        precede or signal black swan events. Uses RSI-based indicators only
+        (no ATR dependency for architecture simplicity).
+
+        Features:
+        1. rsi_shock_1bar: 1 if |1-bar change| > 0.3 (extreme momentum)
+        2. rsi_shock_5bar: 1 if |5-bar change| > 0.5 (sustained momentum)
+        3. extreme_regime_persistence: 1 if in extreme regime > 10 bars
+        4. rsi_volatility_spike: 1 if volatility > mean + 2σ
+        5. rsi_acceleration: 2nd derivative of RSI (momentum change)
+        6. tail_risk_score: composite score [0, 1]
+
+        Returns:
+            DataFrame with 6 columns
+
+        Non-anticipative: Uses only past RSI values and previously extracted features.
+        """
+        # Extract pre-computed features
+        rsi_change_1 = roc["rsi_change_1"]
+        rsi_change_5 = roc["rsi_change_5"]
+        regime = regimes["regime"]
+        bars_in_regime = regimes["bars_in_regime"]
+        rsi_volatility_20 = statistics["rsi_volatility_20"]
+
+        # 1. RSI Shock Detection (VIX-style sudden moves)
+        rsi_shock_1bar = (np.abs(rsi_change_1) > 0.3).astype(np.int64)
+        rsi_shock_5bar = (np.abs(rsi_change_5) > 0.5).astype(np.int64)
+
+        # 2. Extreme Regime Persistence (stuck in extreme zones)
+        is_extreme_regime = (regime != 1).astype(bool)  # Not neutral
+        extreme_regime_persistence = (
+            is_extreme_regime & (bars_in_regime > 10)
+        ).astype(np.int64)
+
+        # 3. RSI Volatility Spike (2σ threshold)
+        # Calculate rolling mean/std of RSI volatility (meta-volatility)
+        vol_rolling = rsi_volatility_20.rolling(window=100, min_periods=20)
+        vol_mean = vol_rolling.mean()
+        vol_std = vol_rolling.std().fillna(0)
+        rsi_volatility_spike = (
+            rsi_volatility_20 > (vol_mean + 2 * vol_std)
+        ).astype(np.int64)
+
+        # 4. RSI Acceleration (2nd derivative - momentum of momentum)
+        # Positive: accelerating upward, Negative: accelerating downward
+        rsi_acceleration = rsi_change_1 - rsi_change_1.shift(1).fillna(0)
+
+        # 5. Tail Risk Composite Score [0, 1]
+        # Weighted combination of binary indicators
+        tail_risk_score = (
+            rsi_shock_1bar * 0.3
+            + rsi_shock_5bar * 0.2
+            + extreme_regime_persistence * 0.2
+            + rsi_volatility_spike * 0.3
+        ).clip(0, 1)
+
+        return pd.DataFrame(
+            {
+                "rsi_shock_1bar": rsi_shock_1bar,
+                "rsi_shock_5bar": rsi_shock_5bar,
+                "extreme_regime_persistence": extreme_regime_persistence,
+                "rsi_volatility_spike": rsi_volatility_spike,
+                "rsi_acceleration": rsi_acceleration,
+                "tail_risk_score": tail_risk_score,
             }
         )

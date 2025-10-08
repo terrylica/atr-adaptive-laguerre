@@ -201,9 +201,9 @@ class TestAvailabilityColumn:
         )
         indicator = ATRAdaptiveLaguerreRSI(config)
 
-        # Should work and return 73 features
+        # Should work and return 91 features
         features = indicator.fit_transform_features(data)
-        assert features.shape[1] == 73
+        assert features.shape[1] == 91
 
         # Check no leakage
         validation_idx = 380

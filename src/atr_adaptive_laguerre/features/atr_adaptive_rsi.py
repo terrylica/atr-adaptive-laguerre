@@ -89,7 +89,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
     )
     filter_redundancy: bool = Field(
         default=True,
-        description="Apply redundancy filtering (reduces 121→79 features, |ρ|>0.9 removed)",
+        description="Apply redundancy filtering (reduces 139→91 features, |ρ|>0.9 removed)",
     )
     availability_column: Optional[str] = Field(
         default=None,
@@ -133,9 +133,9 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create single-interval configuration (27 features).
+        Create single-interval configuration (33 features).
 
-        Features: Base RSI, regime classification, crossings, momentum, statistics.
+        Features: Base RSI, regime classification, crossings, momentum, statistics, tail risk.
         Lookback: ~30 periods
 
         Args:
@@ -145,12 +145,12 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             **kwargs: Additional config parameters
 
         Returns:
-            Config for 27-feature output
+            Config for 33-feature output
 
         Example:
             >>> config = ATRAdaptiveLaguerreRSIConfig.single_interval()
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 27
+            >>> indicator.n_features  # 33
         """
         return cls(
             atr_period=atr_period,
@@ -172,16 +172,16 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create multi-interval configuration (73 features by default).
+        Create multi-interval configuration (91 features by default).
 
         Features:
-        - Base interval (27): All single-interval features with _base suffix
-        - Multiplier 1 (27): Features at {multiplier_1}× timeframe with _mult1 suffix
-        - Multiplier 2 (27): Features at {multiplier_2}× timeframe with _mult2 suffix
+        - Base interval (33): All single-interval features with _base suffix
+        - Multiplier 1 (33): Features at {multiplier_1}× timeframe with _mult1 suffix
+        - Multiplier 2 (33): Features at {multiplier_2}× timeframe with _mult2 suffix
         - Cross-interval (40): Regime alignment, divergence, momentum patterns
 
-        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 73 features).
-        Set filter_redundancy=False to get all 121 features.
+        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 91 features).
+        Set filter_redundancy=False to get all 139 features.
 
         Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
 
@@ -191,31 +191,31 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             atr_period: ATR lookback period (default: 14)
             smoothing_period: Price smoothing period (default: 5)
             date_column: Name of datetime column (default: 'date')
-            filter_redundancy: Apply redundancy filtering (default: True, outputs 79 features)
+            filter_redundancy: Apply redundancy filtering (default: True, outputs 91 features)
             availability_column: Column for data availability timestamps (default: None).
                                Set to prevent data leakage with delayed data (e.g., 'actual_ready_time')
             **kwargs: Additional config parameters
 
         Returns:
-            Config for 79-feature output (or 121 if filter_redundancy=False)
+            Config for 91-feature output (or 139 if filter_redundancy=False)
 
         Example:
-            >>> # Default: redundancy filtering enabled (79 features)
+            >>> # Default: redundancy filtering enabled (91 features)
             >>> config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,  # 4h
             ...     multiplier_2=12  # 12h
             ... )
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 79
+            >>> indicator.n_features  # 91
 
-            >>> # Disable filtering to get all 121 features
+            >>> # Disable filtering to get all 139 features
             >>> config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,
             ...     multiplier_2=12,
             ...     filter_redundancy=False
             ... )
             >>> indicator_unfiltered = ATRAdaptiveLaguerreRSI(config_unfiltered)
-            >>> indicator_unfiltered.n_features  # 121
+            >>> indicator_unfiltered.n_features  # 139
         """
         return cls(
             atr_period=atr_period,
@@ -275,12 +275,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         super().__init__(config)
         self.config: ATRAdaptiveLaguerreRSIConfig = config
 
-        # Warn users if they're using single-interval mode (27 features)
-        # Multi-interval mode (79 features) includes 31 powerful cross-interval analysis features
+        # Warn users if they're using single-interval mode (33 features)
+        # Multi-interval mode (91 features) includes 40 powerful cross-interval analysis features
         if self.config.multiplier_1 is None or self.config.multiplier_2 is None:
             warnings.warn(
-                "Using single-interval mode (27 features). "
-                "For multi-timeframe analysis with 79 features including 31 cross-interval "
+                "Using single-interval mode (33 features). "
+                "For multi-timeframe analysis with 91 features including 40 cross-interval "
                 "features (regime alignment, divergence detection, momentum cascades), "
                 "use: ATRAdaptiveLaguerreRSIConfig.multi_interval(). "
                 "See docs for feature comparison.",
@@ -473,34 +473,34 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         Number of features this configuration will generate.
 
         Returns:
-            27 for single-interval mode
-            121 for multi-interval mode (27×3 intervals + 40 cross-interval)
-            79 for multi-interval with filter_redundancy=True (removes 42 features)
+            33 for single-interval mode
+            139 for multi-interval mode (33×3 intervals + 40 cross-interval)
+            91 for multi-interval with filter_redundancy=True (removes 48 features)
 
         Example:
             >>> config = ATRAdaptiveLaguerreRSIConfig()
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 27
+            >>> indicator.n_features  # 33
 
             >>> config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=4, multiplier_2=12)
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 121
+            >>> indicator.n_features  # 139
 
             >>> config_filtered = ATRAdaptiveLaguerreRSIConfig(
             ...     multiplier_1=4, multiplier_2=12, filter_redundancy=True
             ... )
             >>> indicator_filtered = ATRAdaptiveLaguerreRSI(config_filtered)
-            >>> indicator_filtered.n_features  # 79
+            >>> indicator_filtered.n_features  # 91
         """
         if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
-            # Multi-interval: 27×3 + 40 cross-interval = 121
-            # With redundancy filtering: 121 - 42 = 79
-            base_count = 121
+            # Multi-interval: 33×3 + 40 cross-interval = 139
+            # With redundancy filtering: 139 - 48 = 91
+            base_count = 139
             if self.config.filter_redundancy:
                 from .redundancy_filter import RedundancyFilter
                 return RedundancyFilter.n_features_after_filtering(base_count)
             return base_count
-        return 27  # Single-interval
+        return 33  # Single-interval
 
     @property
     def feature_mode(self) -> str:
@@ -682,10 +682,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
     def fit_transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Transform OHLCV to full feature matrix (27 or 121 columns).
+        Transform OHLCV to full feature matrix (33 or 139 columns).
 
-        Returns 27 single-interval features if multipliers not provided,
-        or 121 features (27 × 3 intervals + 40 cross-interval) if multipliers provided.
+        Returns 33 single-interval features if multipliers not provided,
+        or 139 features (33 × 3 intervals + 40 cross-interval) if multipliers provided.
 
         Args:
             df: OHLCV DataFrame at base interval
@@ -694,14 +694,14 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         Returns:
             DataFrame with features:
-            - If multipliers=None: 27 columns (single-interval)
-            - If multipliers provided: 121 columns (multi-interval + interactions)
+            - If multipliers=None: 33 columns (single-interval)
+            - If multipliers provided: 139 columns (multi-interval + interactions)
 
             Index: Same as input df
-            Columns (121-feature case):
-            - {feature}_base (27 columns)
-            - {feature}_mult1 (27 columns, forward-filled to base)
-            - {feature}_mult2 (27 columns, forward-filled to base)
+            Columns (139-feature case):
+            - {feature}_base (33 columns)
+            - {feature}_mult1 (33 columns, forward-filled to base)
+            - {feature}_mult2 (33 columns, forward-filled to base)
             - Cross-interval interactions (40 columns)
 
         Raises:
@@ -716,7 +716,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             >>> feature = ATRAdaptiveLaguerreRSI(config)
             >>> df_5m = fetcher.fetch("BTCUSDT", "5m", start, end)
             >>> features = feature.fit_transform_features(df_5m)
-            >>> features.shape  # (n_bars, 27)
+            >>> features.shape  # (n_bars, 33)
 
         Example (multi-interval):
             >>> config = ATRAdaptiveLaguerreRSIConfig(
@@ -726,7 +726,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             >>> feature = ATRAdaptiveLaguerreRSI(config)
             >>> df_5m = fetcher.fetch("BTCUSDT", "5m", start, end)
             >>> features = feature.fit_transform_features(df_5m)
-            >>> features.shape  # (n_bars, 121)
+            >>> features.shape  # (n_bars, 139)
         """
         # Validate multiplier configuration
         mult1 = self.config.multiplier_1
