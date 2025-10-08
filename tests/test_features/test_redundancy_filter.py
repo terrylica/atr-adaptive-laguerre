@@ -1,9 +1,9 @@
 """
-Validation tests for redundancy filtering (121→79 features).
+Validation tests for redundancy filtering (121→73 features).
 
 SLOs:
 - Availability: 100% (all tests must pass in CI)
-- Correctness: 100% (exactly 42 features dropped, 79 retained)
+- Correctness: 100% (exactly 48 features dropped, 73 retained)
 - Observability: Full type hints, descriptive test names
 - Maintainability: ≤50 lines per test, single responsibility
 
@@ -29,7 +29,7 @@ def sample_121_features() -> pd.DataFrame:
     Generate sample 121-feature DataFrame for testing.
 
     Returns DataFrame with all 121 feature names from multi-interval mode,
-    including the 42 redundant features that should be filtered.
+    including the 48 redundant features that should be filtered.
     """
     # Generate all 121 feature names (27 × 3 intervals + 40 cross-interval)
     # Base features (27)
@@ -121,7 +121,7 @@ def sample_121_features() -> pd.DataFrame:
 
 
 class TestRedundancyFilter:
-    """Test RedundancyFilter class (42 features removed)."""
+    """Test RedundancyFilter class (48 features removed)."""
 
     def test_filter_disabled_by_default(
         self, sample_121_features: pd.DataFrame
@@ -138,19 +138,19 @@ class TestRedundancyFilter:
         assert list(filtered.columns) == list(sample_121_features.columns)
         pd.testing.assert_frame_equal(filtered, sample_121_features)
 
-    def test_filter_removes_exactly_42_features(
+    def test_filter_removes_exactly_48_features(
         self, sample_121_features: pd.DataFrame
     ) -> None:
         """
-        Test filtering removes exactly 42 redundant features.
+        Test filtering removes exactly 48 redundant features.
 
-        Expected: 121 features → 79 features (42 removed).
+        Expected: 121 features → 73 features (48 removed).
         """
         filtered = RedundancyFilter.filter(sample_121_features, apply_filter=True)
 
         # Verify feature count
         assert sample_121_features.shape[1] == 121
-        assert filtered.shape[1] == 79
+        assert filtered.shape[1] == 73
         assert filtered.shape[0] == sample_121_features.shape[0]  # Rows unchanged
 
     def test_correct_features_removed(
@@ -159,7 +159,7 @@ class TestRedundancyFilter:
         """
         Test that correct redundant features are removed.
 
-        Verify all 42 features in REDUNDANT_FEATURES list are dropped.
+        Verify all 48 features in REDUNDANT_FEATURES list are dropped.
         """
         filtered = RedundancyFilter.filter(sample_121_features, apply_filter=True)
 
@@ -175,16 +175,16 @@ class TestRedundancyFilter:
         for feature in retained_features:
             assert feature in filtered.columns, f"Non-redundant feature '{feature}' incorrectly removed"
 
-    def test_get_redundant_features_returns_42(self) -> None:
+    def test_get_redundant_features_returns_48(self) -> None:
         """
-        Test get_redundant_features returns exactly 42 feature names.
+        Test get_redundant_features returns exactly 48 feature names.
 
         Validates REDUNDANT_FEATURES list completeness.
         """
         redundant = RedundancyFilter.get_redundant_features()
 
         assert isinstance(redundant, list)
-        assert len(redundant) == 42
+        assert len(redundant) == 48
         assert all(isinstance(f, str) for f in redundant)
 
     def test_n_features_after_filtering_calculation(self) -> None:
@@ -193,13 +193,13 @@ class TestRedundancyFilter:
 
         Test cases:
         - 27 features → 27 (no filtering in single-interval)
-        - 121 features → 79 (removes 42 in multi-interval)
+        - 121 features → 73 (removes 48 in multi-interval)
         """
         # Single-interval mode (no filtering)
         assert RedundancyFilter.n_features_after_filtering(27) == 27
 
-        # Multi-interval mode (removes 42)
-        assert RedundancyFilter.n_features_after_filtering(121) == 79
+        # Multi-interval mode (removes 48)
+        assert RedundancyFilter.n_features_after_filtering(121) == 73
 
         # Unknown mode (return as-is)
         assert RedundancyFilter.n_features_after_filtering(100) == 100
@@ -283,7 +283,7 @@ class TestRedundancyFilterIntegration:
         """
         Test filter_redundancy defaults to True.
 
-        Default behavior: 79 features (redundancy filtering enabled).
+        Default behavior: 73 features (redundancy filtering enabled).
         """
         config = ATRAdaptiveLaguerreRSIConfig.multi_interval()
         assert config.filter_redundancy is True
@@ -300,13 +300,13 @@ class TestRedundancyFilterIntegration:
 
     def test_n_features_with_filtering(self) -> None:
         """
-        Test n_features returns 79 when filter_redundancy=True.
+        Test n_features returns 73 when filter_redundancy=True.
 
         Filtered mode: Reduced feature set.
         """
         config = ATRAdaptiveLaguerreRSIConfig.multi_interval(filter_redundancy=True)
         indicator = ATRAdaptiveLaguerreRSI(config)
-        assert indicator.n_features == 79
+        assert indicator.n_features == 73
 
     def test_fit_transform_features_without_filtering(
         self, sample_ohlcv: pd.DataFrame
@@ -329,7 +329,7 @@ class TestRedundancyFilterIntegration:
         self, sample_ohlcv: pd.DataFrame
     ) -> None:
         """
-        Test fit_transform_features returns 79 features when filtering enabled.
+        Test fit_transform_features returns 73 features when filtering enabled.
 
         Validates redundancy filtering integration.
         """
@@ -339,7 +339,7 @@ class TestRedundancyFilterIntegration:
         indicator = ATRAdaptiveLaguerreRSI(config)
         features = indicator.fit_transform_features(sample_ohlcv)
 
-        assert features.shape[1] == 79
+        assert features.shape[1] == 73
         assert features.shape[0] == len(sample_ohlcv)
 
         # Verify redundant features absent

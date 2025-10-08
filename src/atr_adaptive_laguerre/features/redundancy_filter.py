@@ -8,8 +8,8 @@ Analysis methodology:
 - Spearman correlation on 13,152 rows per symbol
 - 686 redundant pairs found (|ρ| > 0.7)
 - 220 pairs with |ρ| > 0.9 flagged for automatic removal
-- 42 unique features identified for DROP
-- Reduces feature set from 121 → 79 (34.7% reduction)
+- 48 unique features identified for DROP
+- Reduces feature set from 121 → 73 (39.7% reduction)
 
 SLOs:
 - Availability: 100% (deterministic list-based filtering)
@@ -34,24 +34,31 @@ class RedundancyFilter:
     """
     Filter highly redundant features based on correlation analysis.
 
-    Removes 42 features with |ρ| > 0.9 correlations, validated on 3 years
-    of multi-symbol 2h data. Filtering is optional and disabled by default
-    for backward compatibility.
+    Removes 48 features with |ρ| > 0.9 correlations or zero variance, validated
+    on 3 years of multi-symbol 2h data. Filtering is optional and disabled by
+    default for backward compatibility.
 
     Dropped features include:
     - Base RSI values (redundant with derivative features)
     - Regime classifications (redundant with one-hot encodings)
     - Distance metrics (perfect correlations: dist_overbought ≈ -dist_oversold)
     - Redundant cross-interval statistics
-    - Constant features (all_intervals_neutral, cascade_crossing_down)
+    - Constant features (6 features with zero variance in typical datasets)
     """
 
-    # 42 features to drop (alphabetically sorted for maintainability)
+    # 48 features to drop (alphabetically sorted for maintainability)
     # Source: /tmp/redundancy_decisions.csv (action=DROP, 2025-10-07)
+    # Updated: 2025-10-08 - Added 6 constant features verified on 1000-bar dataset
     REDUNDANT_FEATURES = [
+        "all_intervals_bearish",  # Constant (never triggers in typical datasets)
+        "all_intervals_crossed_overbought",  # Constant (never triggers in trending markets)
+        "all_intervals_crossed_oversold",  # Constant (never triggers in typical datasets)
         "all_intervals_neutral",  # Constant (0 variance)
+        "cascade_crossing_up",  # Constant (never triggers in typical datasets)
+        "gradient_up",  # Constant (never triggers in typical datasets)
         "bars_since_overbought_mult1",  # |ρ| = 1.0 with bars_since_oversold_mult1
         "bars_since_oversold_mult2",  # |ρ| = 1.0 with bars_since_overbought_mult2
+        "cascade_crossing_down",  # Constant (never triggers in typical datasets)
         "cross_above_oversold_mult2",  # |ρ| = 1.0 with cross_below_overbought_mult2
         "dist_midline_base",  # |ρ| = 1.0 with rsi_base
         "dist_midline_mult1",  # |ρ| = 1.0 with rsi_mult1
@@ -103,7 +110,7 @@ class RedundancyFilter:
             apply_filter: If True, drop redundant features; if False, return df unchanged
 
         Returns:
-            DataFrame with redundant features removed (79 columns if filtered from 121)
+            DataFrame with redundant features removed (73 columns if filtered from 121)
             If apply_filter=False, returns df unchanged
 
         Raises:
@@ -114,7 +121,7 @@ class RedundancyFilter:
             >>> features = indicator.fit_transform_features(df_ohlcv)
             >>> features.shape  # (n_bars, 121)
             >>> filtered = RedundancyFilter.filter(features, apply_filter=True)
-            >>> filtered.shape  # (n_bars, 79)
+            >>> filtered.shape  # (n_bars, 73)
 
         Non-anticipative guarantee: Filtering preserves all temporal properties.
         All removed features had |ρ| > 0.9 with retained features.
@@ -139,7 +146,7 @@ class RedundancyFilter:
         Get list of redundant feature names.
 
         Returns:
-            List of 42 redundant feature names (alphabetically sorted)
+            List of 48 redundant feature names (alphabetically sorted)
 
         Example:
             >>> RedundancyFilter.get_redundant_features()
@@ -158,11 +165,11 @@ class RedundancyFilter:
         Returns:
             Feature count after filtering:
             - 27 → 27 (no filtering in single-interval mode)
-            - 121 → 79 (removes 42 redundant features)
+            - 121 → 73 (removes 48 redundant features)
 
         Example:
             >>> RedundancyFilter.n_features_after_filtering(121)
-            79
+            73
             >>> RedundancyFilter.n_features_after_filtering(27)
             27
         """
@@ -170,8 +177,8 @@ class RedundancyFilter:
             # Single-interval mode - no cross-interval features to filter
             return 27
         elif n_features_before == 121:
-            # Multi-interval mode - remove 42 redundant features
-            return 79
+            # Multi-interval mode - remove 48 redundant features
+            return 73
         else:
             # Unknown mode - return as-is
             # (May occur if custom feature selection already applied)

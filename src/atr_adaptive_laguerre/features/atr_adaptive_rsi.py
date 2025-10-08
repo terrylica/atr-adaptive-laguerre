@@ -172,7 +172,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create multi-interval configuration (79 features by default).
+        Create multi-interval configuration (73 features by default).
 
         Features:
         - Base interval (27): All single-interval features with _base suffix
@@ -180,7 +180,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         - Multiplier 2 (27): Features at {multiplier_2}× timeframe with _mult2 suffix
         - Cross-interval (40): Regime alignment, divergence, momentum patterns
 
-        Default: Redundancy filtering enabled (removes 42 features with |ρ| > 0.9, outputs 79 features).
+        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 73 features).
         Set filter_redundancy=False to get all 121 features.
 
         Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
