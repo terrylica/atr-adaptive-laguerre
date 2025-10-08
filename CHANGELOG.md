@@ -5,6 +5,19 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.11 (2025-10-08)
+
+### 📚 Documentation
+
+- **Complete documentation update for v1.0.10 feature counts**
+  - Updated README.md with correct counts (31/85/133)
+  - Updated API_REFERENCE.md with correct counts throughout
+  - Updated all Python docstrings in multi_interval.py and cross_interval.py
+  - Updated all test files with correct assertions
+  - **Impact**: Ensures accurate documentation for users exploring package via Claude Code CLI
+
+**Note**: v1.0.10 was published to PyPI with outdated README embedded in tarball. This patch release corrects all documentation.
+
 ## v1.0.10 (2025-10-08)
 
 ### 🔬 Feature Validation & Refinement

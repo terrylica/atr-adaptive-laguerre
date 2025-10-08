@@ -4,7 +4,7 @@ ATR-Adaptive Laguerre RSI Feature Engineering Library.
 Non-anticipative volatility-adaptive momentum indicator for seq-2-seq forecasting.
 """
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 
 # Core components
 from atr_adaptive_laguerre.core import (  # noqa: F401
