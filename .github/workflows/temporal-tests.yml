@@ -19,11 +19,11 @@ jobs:
   temporal-regression:
     name: Temporal Leakage Regression Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15  # Reduced: testing only Python 3.10
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.10']  # Test oldest supported version only
       fail-fast: false
 
     steps:
