@@ -9,7 +9,7 @@ Analysis methodology:
 - 686 redundant pairs found (|ρ| > 0.7)
 - 220 pairs with |ρ| > 0.9 flagged for automatic removal
 - 48 unique features identified for DROP
-- Reduces feature set from 121 → 73 (39.7% reduction)
+- Reduces feature set from 133 → 85 (36.1% reduction)
 
 SLOs:
 - Availability: 100% (deterministic list-based filtering)

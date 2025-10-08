@@ -5,6 +5,39 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.10 (2025-10-08)
+
+### 🔬 Feature Validation & Refinement
+
+- **Refined tail risk features based on IC validation** (QUALITY IMPROVEMENT)
+  - Removed `rsi_shock_5bar` (-70.1% IC loss vs source feature `rsi_change_5`)
+  - Removed `rsi_acceleration` (-34.9% IC loss vs source feature `rsi_velocity`)
+  - Validated `rsi_shock_1bar` (+18.6% IC gain) and `rsi_volatility_spike` (+40.7% IC gain)
+  - Retained `extreme_regime_persistence` and `tail_risk_score` (composite features)
+  - Updated `tail_risk_score` formula with reweighted components (0.4, 0.3, 0.3)
+
+  **Methodology**: Out-of-sample IC validation on 3,276 bars (BTCUSDT 2h, 2025-01-01 to 2025-09-30)
+  **Decision threshold**: IC gain > +5% to KEEP, < -5% to DROP
+
+### 📊 Feature Counts
+
+- **Per-interval features**: 33 → **31** (-2 features)
+- **Multi-interval unfiltered**: 139 → **133** (-6 features across 3 intervals)
+- **Multi-interval filtered (default)**: 91 → **85** (-6 features)
+- **Single-interval**: 33 → **31** (-2 features)
+
+**What users get by default**:
+- `ATRAdaptiveLaguerreRSIConfig.multi_interval()` → **85 features** (filter_redundancy=True)
+- `ATRAdaptiveLaguerreRSIConfig.multi_interval(filter_redundancy=False)` → **133 features**
+- `ATRAdaptiveLaguerreRSIConfig.single_interval()` → **31 features**
+
+### ✅ Validation
+
+- Confirmed IC gains for kept features on out-of-sample data
+- Validated non-anticipative guarantee for 31-feature pipeline
+- All tests passing with updated feature counts
+- Redundancy filtering unchanged (48 features removed, threshold |ρ| > 0.9)
+
 ## v1.0.6 (2025-10-07)
 
 ### 🎯 UX Improvements

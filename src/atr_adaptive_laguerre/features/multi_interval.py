@@ -76,12 +76,12 @@ class MultiIntervalProcessor:
                               (e.g., ATRAdaptiveLaguerreRSI.fit_transform_features)
 
         Returns:
-            DataFrame with 81 columns (27 features × 3 intervals)
+            DataFrame with 93 columns (31 features × 3 intervals)
             Index: Same as input df (base resolution)
             Columns:
-            - {feature}_base (27 columns from base interval)
-            - {feature}_mult1 (27 columns from mult1 interval, forward-filled)
-            - {feature}_mult2 (27 columns from mult2 interval, forward-filled)
+            - {feature}_base (31 columns from base interval)
+            - {feature}_mult1 (31 columns from mult1 interval, forward-filled)
+            - {feature}_mult2 (31 columns from mult2 interval, forward-filled)
 
         Raises:
             ValueError: If df missing required OHLCV columns

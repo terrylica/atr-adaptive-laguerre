@@ -43,9 +43,9 @@ class CrossIntervalFeatures:
         Extract 40 cross-interval interaction features.
 
         Args:
-            features_base: 27 features from base interval
-            features_mult1: 27 features from mult1 interval (aligned to base)
-            features_mult2: 27 features from mult2 interval (aligned to base)
+            features_base: 31 features from base interval
+            features_mult1: 31 features from mult1 interval (aligned to base)
+            features_mult2: 31 features from mult2 interval (aligned to base)
 
         Returns:
             DataFrame with 40 columns:

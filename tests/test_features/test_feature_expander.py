@@ -1,5 +1,5 @@
 """
-Validation tests for feature extraction pipeline (33 + 139 features).
+Validation tests for feature extraction pipeline (31 + 133 features).
 
 SLOs:
 - Availability: 99.9% (all tests must pass in CI)
@@ -306,13 +306,15 @@ class TestFeatureExpander:
         """
         Test tail risk / black swan detection features are valid.
 
-        Features tested:
-        1. rsi_shock_1bar: Binary flag for |1-bar change| > 0.3
-        2. rsi_shock_5bar: Binary flag for |5-bar change| > 0.5
-        3. extreme_regime_persistence: Binary flag for extreme regime > 10 bars
-        4. rsi_volatility_spike: Binary flag for volatility > mean + 2σ
-        5. rsi_acceleration: 2nd derivative of RSI
-        6. tail_risk_score: Composite score [0, 1]
+        Features tested (IC-validated on out-of-sample data):
+        1. rsi_shock_1bar: Binary flag for |1-bar change| > 0.3 [+18.6% IC gain]
+        2. extreme_regime_persistence: Binary flag for extreme regime > 10 bars [composite]
+        3. rsi_volatility_spike: Binary flag for volatility > mean + 2σ [+40.7% IC gain]
+        4. tail_risk_score: Composite score [0, 1]
+
+        Removed features (IC validation 2025-10-08):
+        - rsi_shock_5bar: -70.1% IC loss vs source
+        - rsi_acceleration: -34.9% IC loss vs source
         """
         # Create RSI with known tail risk events
         np.random.seed(42)
@@ -335,24 +337,22 @@ class TestFeatureExpander:
 
         # Test feature existence
         assert "rsi_shock_1bar" in features.columns
-        assert "rsi_shock_5bar" in features.columns
         assert "extreme_regime_persistence" in features.columns
         assert "rsi_volatility_spike" in features.columns
-        assert "rsi_acceleration" in features.columns
         assert "tail_risk_score" in features.columns
+
+        # Verify removed features are not present
+        assert "rsi_shock_5bar" not in features.columns
+        assert "rsi_acceleration" not in features.columns
 
         # Test binary feature ranges
         assert set(features["rsi_shock_1bar"].unique()).issubset({0, 1})
-        assert set(features["rsi_shock_5bar"].unique()).issubset({0, 1})
         assert set(features["extreme_regime_persistence"].unique()).issubset({0, 1})
         assert set(features["rsi_volatility_spike"].unique()).issubset({0, 1})
 
         # Test tail_risk_score range [0, 1]
         assert features["tail_risk_score"].min() >= 0.0
         assert features["tail_risk_score"].max() <= 1.0
-
-        # Test rsi_acceleration is unbounded but reasonable
-        assert np.abs(features["rsi_acceleration"]).max() < 1.0  # Should be small for realistic RSI
 
         # Test shock detection at bar 50
         assert features.loc[50, "rsi_shock_1bar"] == 1
@@ -537,23 +537,23 @@ class TestCrossIntervalFeatures:
 
 
 class TestFullFeaturePipeline:
-    """Test full feature extraction pipeline (139 features)."""
+    """Test full feature extraction pipeline (133 features)."""
 
     def test_all_features_non_anticipative(self, sample_ohlcv: pd.DataFrame) -> None:
         """
-        Test 139-feature pipeline preserves non-anticipative guarantee.
+        Test 133-feature pipeline preserves non-anticipative guarantee.
 
         Note: Multi-interval features (e.g., rsi_mult1, rsi_mult2) are history-dependent
         because they're computed on resampled data with stateful indicators (ATR, Laguerre).
         This is NOT lookahead bias - it's expected behavior.
 
         We verify non-anticipative property by testing:
-        1. Base interval features (33 columns with _base suffix) are non-anticipative
+        1. Base interval features (31 columns with _base suffix) are non-anticipative
         2. Cross-interval interactions derived from base features are deterministic
-        3. Output shape is correct (139 columns)
+        3. Output shape is correct (133 columns)
         """
         # Configure multi-interval extraction with smaller periods to fit in sample data
-        # Explicitly disable filtering to test all 139 features
+        # Explicitly disable filtering to test all 133 features
         config = ATRAdaptiveLaguerreRSIConfig(
             atr_period=14,
             smoothing_period=5,
@@ -563,16 +563,16 @@ class TestFullFeaturePipeline:
         )
         feature = ATRAdaptiveLaguerreRSI(config)
 
-        # Compute full 139 features
+        # Compute full 133 features
         features_full = feature.fit_transform_features(sample_ohlcv)
 
         # Verify output shape
-        assert features_full.shape[1] == 139
+        assert features_full.shape[1] == 133
         assert len(features_full) == len(sample_ohlcv)
 
         # Extract base interval columns (those ending with _base)
         base_cols = [col for col in features_full.columns if col.endswith("_base")]
-        assert len(base_cols) == 33  # Should have 33 base features
+        assert len(base_cols) == 31  # Should have 31 base features
 
         # Test that base features are non-anticipative
         test_lengths = [

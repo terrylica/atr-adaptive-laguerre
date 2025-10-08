@@ -89,7 +89,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
     )
     filter_redundancy: bool = Field(
         default=True,
-        description="Apply redundancy filtering (reduces 139→91 features, |ρ|>0.9 removed)",
+        description="Apply redundancy filtering (reduces 133→85 features, |ρ|>0.9 removed)",
     )
     availability_column: Optional[str] = Field(
         default=None,
@@ -133,7 +133,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create single-interval configuration (33 features).
+        Create single-interval configuration (31 features).
 
         Features: Base RSI, regime classification, crossings, momentum, statistics, tail risk.
         Lookback: ~30 periods
@@ -172,16 +172,16 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create multi-interval configuration (91 features by default).
+        Create multi-interval configuration (85 features by default).
 
         Features:
-        - Base interval (33): All single-interval features with _base suffix
-        - Multiplier 1 (33): Features at {multiplier_1}× timeframe with _mult1 suffix
-        - Multiplier 2 (33): Features at {multiplier_2}× timeframe with _mult2 suffix
+        - Base interval (31): All single-interval features with _base suffix
+        - Multiplier 1 (31): Features at {multiplier_1}× timeframe with _mult1 suffix
+        - Multiplier 2 (31): Features at {multiplier_2}× timeframe with _mult2 suffix
         - Cross-interval (40): Regime alignment, divergence, momentum patterns
 
-        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 91 features).
-        Set filter_redundancy=False to get all 139 features.
+        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 85 features).
+        Set filter_redundancy=False to get all 133 features.
 
         Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
 
@@ -191,31 +191,31 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             atr_period: ATR lookback period (default: 14)
             smoothing_period: Price smoothing period (default: 5)
             date_column: Name of datetime column (default: 'date')
-            filter_redundancy: Apply redundancy filtering (default: True, outputs 91 features)
+            filter_redundancy: Apply redundancy filtering (default: True, outputs 85 features)
             availability_column: Column for data availability timestamps (default: None).
                                Set to prevent data leakage with delayed data (e.g., 'actual_ready_time')
             **kwargs: Additional config parameters
 
         Returns:
-            Config for 91-feature output (or 139 if filter_redundancy=False)
+            Config for 85-feature output (or 133 if filter_redundancy=False)
 
         Example:
-            >>> # Default: redundancy filtering enabled (91 features)
+            >>> # Default: redundancy filtering enabled (85 features)
             >>> config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,  # 4h
             ...     multiplier_2=12  # 12h
             ... )
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 91
+            >>> indicator.n_features  # 85
 
-            >>> # Disable filtering to get all 139 features
+            >>> # Disable filtering to get all 133 features
             >>> config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,
             ...     multiplier_2=12,
             ...     filter_redundancy=False
             ... )
             >>> indicator_unfiltered = ATRAdaptiveLaguerreRSI(config_unfiltered)
-            >>> indicator_unfiltered.n_features  # 139
+            >>> indicator_unfiltered.n_features  # 133
         """
         return cls(
             atr_period=atr_period,
@@ -275,12 +275,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         super().__init__(config)
         self.config: ATRAdaptiveLaguerreRSIConfig = config
 
-        # Warn users if they're using single-interval mode (33 features)
-        # Multi-interval mode (91 features) includes 40 powerful cross-interval analysis features
+        # Warn users if they're using single-interval mode (31 features)
+        # Multi-interval mode (85 features) includes 40 powerful cross-interval analysis features
         if self.config.multiplier_1 is None or self.config.multiplier_2 is None:
             warnings.warn(
-                "Using single-interval mode (33 features). "
-                "For multi-timeframe analysis with 91 features including 40 cross-interval "
+                "Using single-interval mode (31 features). "
+                "For multi-timeframe analysis with 85 features including 40 cross-interval "
                 "features (regime alignment, divergence detection, momentum cascades), "
                 "use: ATRAdaptiveLaguerreRSIConfig.multi_interval(). "
                 "See docs for feature comparison.",
@@ -682,10 +682,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
     def fit_transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Transform OHLCV to full feature matrix (33 or 139 columns).
+        Transform OHLCV to full feature matrix (31 or 133 columns).
 
-        Returns 33 single-interval features if multipliers not provided,
-        or 139 features (33 × 3 intervals + 40 cross-interval) if multipliers provided.
+        Returns 31 single-interval features if multipliers not provided,
+        or 133 features (31 × 3 intervals + 40 cross-interval) if multipliers provided.
 
         Args:
             df: OHLCV DataFrame at base interval

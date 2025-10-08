@@ -199,11 +199,11 @@ class TestWalkForwardValidation:
         # Ensure train window has enough data AND test window has enough data
         train_end = max(min_bars, min(600, len(walk_forward_data) - min_bars))
 
-        # Extract 121 features on training window
+        # Extract 133 features on training window
         train_df = walk_forward_data.iloc[:train_end]
         features_train = feature.fit_transform_features(train_df)
 
-        # Extract 121 features on full data
+        # Extract 133 features on full data
         features_full = feature.fit_transform_features(walk_forward_data)
 
         # Verify training features don't change when full data available

@@ -64,15 +64,15 @@ rsi = feature.fit_transform(df)
 fit_transform_features(df: pd.DataFrame) -> pd.DataFrame
 ```
 
-Extract expanded feature set (27 single-interval or 121 multi-interval features).
+Extract expanded feature set (31 single-interval or 133 multi-interval features).
 
 **Parameters**:
 - `df` (pd.DataFrame): OHLCV dataframe with columns `['open', 'high', 'low', 'close', 'volume']`
 
 **Returns**:
 - `pd.DataFrame`: Feature matrix
-  - Single-interval (no multipliers): 27 features
-  - Multi-interval (with multipliers): 121 features (27×3 + 40 interactions)
+  - Single-interval (no multipliers): 31 features
+  - Multi-interval (with multipliers): 133 features (31×3 + 40 interactions)
 
 **Feature Categories** (single-interval):
 1. Base indicator: `rsi`
@@ -95,13 +95,13 @@ Extract expanded feature set (27 single-interval or 121 multi-interval features)
 
 **Example**:
 ```python
-# Single-interval (27 features)
+# Single-interval (31 features)
 config = ATRAdaptiveLaguerreRSIConfig(atr_period=32, smoothing_period=5)
 feature = ATRAdaptiveLaguerreRSI(config)
 features = feature.fit_transform_features(df)
-# Output: DataFrame with 27 columns
+# Output: DataFrame with 31 columns
 
-# Multi-interval (121 features)
+# Multi-interval (133 features)
 config = ATRAdaptiveLaguerreRSIConfig(
     atr_period=32,
     smoothing_period=5,
@@ -110,7 +110,7 @@ config = ATRAdaptiveLaguerreRSIConfig(
 )
 feature = ATRAdaptiveLaguerreRSI(config)
 features = feature.fit_transform_features(df)
-# Output: DataFrame with 121 columns (27×3 + 40 interactions)
+# Output: DataFrame with 133 columns (31×3 + 40 interactions)
 ```
 
 ##### validate_non_anticipative
@@ -203,8 +203,8 @@ class ATRAdaptiveLaguerreRSIConfig:
 - `multiplier_2` (int | None, default=None): Second interval multiplier (e.g., 12 for 12× base)
 
 **Multi-Interval Behavior**:
-- If both `multiplier_1` and `multiplier_2` are `None`: Single-interval mode (27 features)
-- If both are set: Multi-interval mode (121 features)
+- If both `multiplier_1` and `multiplier_2` are `None`: Single-interval mode (31 features)
+- If both are set: Multi-interval mode (133 features)
 - Setting only one multiplier is not supported
 
 **Example**:
@@ -234,7 +234,7 @@ config = ATRAdaptiveLaguerreRSIConfig(
 
 ### FeatureExpander
 
-Single-interval feature expansion (1 RSI column → 27 features).
+Single-interval feature expansion (1 RSI column → 31 features).
 
 **Module**: `atr_adaptive_laguerre.features`
 
@@ -252,7 +252,7 @@ from atr_adaptive_laguerre import FeatureExpander
 expand(rsi: pd.Series, level_up: float = 0.85, level_down: float = 0.15) -> pd.DataFrame
 ```
 
-Expand single RSI series to 27 derived features.
+Expand single RSI series to 31 derived features.
 
 **Parameters**:
 - `rsi` (pd.Series): RSI values in range [0.0, 1.0]
@@ -260,20 +260,20 @@ Expand single RSI series to 27 derived features.
 - `level_down` (float, default=0.15): Lower threshold
 
 **Returns**:
-- `pd.DataFrame`: 27-column feature matrix
+- `pd.DataFrame`: 31-column feature matrix
 
 **Example**:
 ```python
 rsi = feature.fit_transform(df)
 expanded = FeatureExpander.expand(rsi, level_up=0.85, level_down=0.15)
-# Output: 27 columns including regime, crossings, temporal, etc.
+# Output: 31 columns including regime, crossings, temporal, tail risk, etc.
 ```
 
 ---
 
 ### MultiIntervalProcessor
 
-Multi-interval orchestration (3 intervals → 121 features).
+Multi-interval orchestration (3 intervals → 133 features).
 
 **Module**: `atr_adaptive_laguerre.features`
 
@@ -303,12 +303,12 @@ Process multi-interval feature extraction.
 - `base_rsi_calculator` (Callable): Function to compute base RSI from OHLCV
 
 **Returns**:
-- `pd.DataFrame`: 121-column feature matrix (27×3 + 40 interactions)
+- `pd.DataFrame`: 133-column feature matrix (31×3 + 40 interactions)
 
 **Internal Logic**:
 1. Resample to multiplier intervals
 2. Compute RSI for each interval
-3. Expand each RSI to 27 features
+3. Expand each RSI to 31 features
 4. Compute 40 cross-interval interactions
 5. Concatenate all features
 
@@ -320,7 +320,7 @@ def calculate_base_rsi(df: pd.DataFrame) -> pd.Series:
     return feature.fit_transform(df)
 
 features = MultiIntervalProcessor.process(df, config, calculate_base_rsi)
-# Output: 121 columns (27×3 + 40 interactions)
+# Output: 133 columns (31×3 + 40 interactions)
 ```
 
 ---
@@ -348,9 +348,9 @@ compute(base_features: pd.DataFrame, mult1_features: pd.DataFrame, mult2_feature
 Compute 40 cross-interval interaction features.
 
 **Parameters**:
-- `base_features` (pd.DataFrame): Base interval features (27 columns)
-- `mult1_features` (pd.DataFrame): First multiplier interval features (27 columns)
-- `mult2_features` (pd.DataFrame): Second multiplier interval features (27 columns)
+- `base_features` (pd.DataFrame): Base interval features (31 columns)
+- `mult1_features` (pd.DataFrame): First multiplier interval features (31 columns)
+- `mult2_features` (pd.DataFrame): Second multiplier interval features (31 columns)
 
 **Returns**:
 - `pd.DataFrame`: 40 cross-interval interaction features

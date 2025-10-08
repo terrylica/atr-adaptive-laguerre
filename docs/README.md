@@ -16,8 +16,8 @@ This library implements the ATR-Adaptive Laguerre RSI indicator, designed for ro
 
 - ✅ **Non-anticipative**: Guaranteed no lookahead bias
 - ✅ **O(1) Incremental**: Efficient streaming updates with `.update()` method
-- ✅ **Multi-interval**: Supports 1s-1d timeframes with 79-feature extraction (121 without filtering)
-- ✅ **Redundancy filtering**: Optional 121→79 feature reduction (|ρ| > 0.9 removed)
+- ✅ **Multi-interval**: Supports 1s-1d timeframes with 85-feature extraction (133 without filtering)
+- ✅ **Redundancy filtering**: Optional 133→85 feature reduction (|ρ| > 0.9 removed)
 - ✅ **Flexible datetime**: Works with DatetimeIndex, 'date' column, or custom column names
 - ✅ **Validated**: Information coefficient > 0.03 on k-step-ahead returns
 
@@ -33,16 +33,17 @@ This package supports two operational modes with very different capabilities:
 
 | Mode | Features | Lookback | Use Case |
 |------|----------|----------|----------|
-| **Multi-Interval** (Recommended) | **79** | 360 bars | Production ML pipelines - includes cross-timeframe analysis |
-| **Single-Interval** | 27 | 30 bars | Minimal data requirements or single-timeframe analysis |
+| **Multi-Interval** (Recommended) | **85** | 360 bars | Production ML pipelines - includes cross-timeframe analysis |
+| **Single-Interval** | 31 | 30 bars | Minimal data requirements or single-timeframe analysis |
 
 ### ⚠️ Important: Multi-Interval Mode is Recommended
 
-**If you're building ML features, you want multi-interval mode (79 features)**, which includes:
-- Base interval features (16)
-- First multiplier interval features (15)
-- Second multiplier interval features (17)
-- **Cross-interval analysis features (31)** ← Unique to multi-interval mode!
+**If you're building ML features, you want multi-interval mode (85 features)**, which includes:
+- Base interval features (31)
+- First multiplier interval features (31)
+- Second multiplier interval features (31)
+- **Cross-interval analysis features (40)** ← Unique to multi-interval mode!
+- Redundancy filtered: 133 → 85 features (48 redundant features removed)
 
 Cross-interval features detect multi-timeframe patterns like:
 - Regime alignment across timeframes
@@ -53,7 +54,7 @@ Cross-interval features detect multi-timeframe patterns like:
 
 ## Quick Start
 
-### Multi-Interval Mode (Recommended - 79 Features)
+### Multi-Interval Mode (Recommended - 85 Features)
 
 ```python
 from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRAdaptiveLaguerreRSIConfig
@@ -65,22 +66,22 @@ config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
 )
 indicator = ATRAdaptiveLaguerreRSI(config)
 
-# Extract 79 features across 3 timeframes
+# Extract 85 features across 3 timeframes (31 per interval + 40 cross-interval, filtered)
 features_df = indicator.fit_transform_features(df)
 
-print(f"Features extracted: {indicator.n_features}")  # 79
+print(f"Features extracted: {indicator.n_features}")  # 85
 print(f"Min data required: {indicator.min_lookback_base_interval} bars")  # 360
 ```
 
-### Single-Interval Mode (Minimal Lookback - 27 Features)
+### Single-Interval Mode (Minimal Lookback - 31 Features)
 
 Use this mode only if you have limited historical data or need single-timeframe analysis:
 
 ```python
 from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ATRAdaptiveLaguerreRSIConfig
 
-# Single-interval mode (WARNING: only 27 features, missing cross-timeframe analysis)
-config = ATRAdaptiveLaguerreRSIConfig(
+# Single-interval mode (WARNING: only 31 features, missing cross-timeframe analysis)
+config = ATRAdaptiveLaguerreRSIConfig.single_interval(
     atr_period=14,
     smoothing_period=5,
     date_column='date'  # Or use DatetimeIndex
@@ -90,10 +91,10 @@ indicator = ATRAdaptiveLaguerreRSI(config)
 # Get single RSI value
 rsi_series = indicator.fit_transform(df)  # Returns pd.Series (single RSI column)
 
-# Or get 27 single-interval features
-features_df = indicator.fit_transform_features(df)  # Returns DataFrame with 27 columns
+# Or get 31 single-interval features
+features_df = indicator.fit_transform_features(df)  # Returns DataFrame with 31 columns
 
-print(f"Features extracted: {indicator.n_features}")  # 27
+print(f"Features extracted: {indicator.n_features}")  # 31
 print(f"Min data required: {indicator.min_lookback} bars")  # 30
 ```
 
@@ -107,29 +108,29 @@ new_row = {'open': 100, 'high': 101, 'low': 99, 'close': 100.5, 'volume': 1000}
 new_rsi = indicator.update(new_row)  # Returns float (O(1) complexity)
 ```
 
-### Disabling Redundancy Filtering (79 → 121 Features)
+### Disabling Redundancy Filtering (85 → 133 Features)
 
 ```python
-# Disable redundancy filtering to get all 121 features
+# Disable redundancy filtering to get all 133 features
 config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
     multiplier_1=4,
     multiplier_2=12,
-    filter_redundancy=False  # Get all 121 features
+    filter_redundancy=False  # Get all 133 features
 )
 feature = ATRAdaptiveLaguerreRSI(config)
 
-# Returns DataFrame with 121 columns (all features, including 42 redundant ones)
+# Returns DataFrame with 133 columns (all features, including 48 redundant ones)
 features_df = feature.fit_transform_features(df)
 
 # Verify feature count
-print(f"Features: {feature.n_features}")  # 121 (79 by default)
+print(f"Features: {feature.n_features}")  # 133 (85 by default)
 
 # Redundancy filtering (enabled by default):
 # - Data: 3 years of 2h OHLCV (BTCUSDT, ETHUSDT, SOLUSDT)
 # - Threshold: |ρ| > 0.9 (perfect correlations and near-redundant features)
 # - Removes: Base RSI values, redundant distance metrics, duplicate regime features
-# - Retains: Rate-of-change, cross-interval, and temporal features
-# - IC validation: +45.54% improvement (PASSED)
+# - Retains: Rate-of-change, cross-interval, temporal features, and tail risk features
+# - IC validation: Tail risk features validated on out-of-sample data (2025-10-08)
 ```
 
 ## Documentation
