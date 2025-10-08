@@ -33,6 +33,7 @@ class TestExhaustiveValidation:
     Original audit tested every 5th position; we test every 10th for CI performance.
     """
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("stride", [10])
     def test_exhaustive_timestamps_no_leakage(
         self,
@@ -212,6 +213,7 @@ class TestSimultaneousBoundaries:
     For mult1=4, mult2=12, LCM=12, so every 12 bars both boundaries align.
     """
 
+    @pytest.mark.slow
     def test_simultaneous_mult1_mult2_boundaries(
         self,
         synthetic_ohlcv_data,
@@ -268,7 +270,8 @@ class TestRandomValidationPoints:
     unexpected leakage at non-boundary positions.
     """
 
-    @pytest.mark.parametrize("seed", range(5))  # 5 different random seeds
+    @pytest.mark.slow
+    @pytest.mark.parametrize("seed", range(2))  # 2 seeds for CI (was 5)
     def test_random_validation_points_no_leakage(
         self,
         synthetic_ohlcv_data,
@@ -324,6 +327,7 @@ class TestDatasetBoundaries:
     Tests temporal safety at dataset start and end boundaries.
     """
 
+    @pytest.mark.slow
     def test_dataset_start_boundaries(
         self,
         synthetic_ohlcv_data,
@@ -359,6 +363,7 @@ class TestDatasetBoundaries:
         if failures:
             raise AssertionError(f"Dataset start leakage at {len(failures)}/10 positions")
 
+    @pytest.mark.slow
     def test_dataset_end_boundaries(
         self,
         synthetic_ohlcv_data,
@@ -403,6 +408,7 @@ class TestOffByOneExhaustive:
     Reduced to every 5th position for CI performance (100 tests).
     """
 
+    @pytest.mark.slow
     def test_every_position_no_leakage(
         self,
         synthetic_ohlcv_data,

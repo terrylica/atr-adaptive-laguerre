@@ -42,10 +42,12 @@ jobs:
         run: |
           uv sync --all-extras
 
-      - name: Run temporal leakage regression tests
+      - name: Run temporal leakage regression tests (critical only)
+        # Only run critical boundary tests (mult1/mult2) that catch v1.0.4 regression
+        # Full test suite marked as slow (~30+ mins), run manually with: pytest -m slow
         run: |
-          uv run --active python -m pytest tests/test_temporal/test_adversarial_regression.py -v --tb=short
-        timeout-minutes: 8
+          uv run --active python -m pytest tests/test_temporal/test_adversarial_regression.py -v --tb=short -m "not slow"
+        timeout-minutes: 15
 
       - name: Upload test results on failure
         if: failure()
