@@ -19,7 +19,7 @@ jobs:
   temporal-regression:
     name: Temporal Leakage Regression Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     strategy:
       matrix:
