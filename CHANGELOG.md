@@ -5,6 +5,26 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.12 (2025-10-08)
+
+### 🐛 Bug Fix
+
+- **Fixed `n_features` property reporting incorrect values** (CRITICAL)
+  - Property was returning OLD feature counts (33/139/91) instead of NEW counts (31/133/85)
+  - Discrepancy: 6 features (2 removed features × 3 intervals)
+  - **Impact**: Users relying on `indicator.n_features` for array allocation or validation would see mismatches
+
+  **Root cause**: Hardcoded values in `n_features` property not updated during v1.0.10 tail risk refinement
+
+  **Fix**:
+  - Updated `n_features` property: 33→31 (single), 139→133 (multi-unfiltered), 91→85 (multi-filtered)
+  - Updated `RedundancyFilter.n_features_after_filtering()` to handle new counts
+  - All modes now return accurate feature counts matching actual DataFrame output
+
+  **Validation**: Created test script verifying `n_features` matches `features.shape[1]` for all modes ✓
+
+**Thanks to user bug report for identifying this critical discrepancy!**
+
 ## v1.0.11 (2025-10-08)
 
 ### 📚 Documentation

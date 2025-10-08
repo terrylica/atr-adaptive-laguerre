@@ -160,29 +160,34 @@ class RedundancyFilter:
         Calculate expected feature count after filtering.
 
         Args:
-            n_features_before: Original feature count (27, 33, 121, or 139)
+            n_features_before: Original feature count (27, 31, 33, 121, 133, or 139)
 
         Returns:
             Feature count after filtering:
             - 27 → 27 (legacy single-interval mode, no filtering)
-            - 33 → 33 (single-interval with tail risk, no filtering)
+            - 31 → 31 (single-interval v1.0.10+, no filtering)
+            - 33 → 33 (single-interval v1.0.9, no filtering)
             - 121 → 73 (legacy multi-interval, removes 48 redundant features)
-            - 139 → 91 (multi-interval with tail risk, removes 48 redundant features)
+            - 133 → 85 (multi-interval v1.0.10+, removes 48 redundant features)
+            - 139 → 91 (multi-interval v1.0.9, removes 48 redundant features)
 
         Example:
-            >>> RedundancyFilter.n_features_after_filtering(139)
-            91
-            >>> RedundancyFilter.n_features_after_filtering(33)
-            33
+            >>> RedundancyFilter.n_features_after_filtering(133)
+            85
+            >>> RedundancyFilter.n_features_after_filtering(31)
+            31
         """
-        if n_features_before in (27, 33):
+        if n_features_before in (27, 31, 33):
             # Single-interval mode - no cross-interval features to filter
             return n_features_before
         elif n_features_before == 121:
             # Legacy multi-interval mode - remove 48 redundant features
             return 73
+        elif n_features_before == 133:
+            # Multi-interval v1.0.10+ - remove 48 redundant features
+            return 85
         elif n_features_before == 139:
-            # Multi-interval with tail risk - remove 48 redundant features
+            # Multi-interval v1.0.9 - remove 48 redundant features
             return 91
         else:
             # Unknown mode - return as-is

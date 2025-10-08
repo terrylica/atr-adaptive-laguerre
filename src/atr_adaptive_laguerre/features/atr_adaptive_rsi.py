@@ -473,34 +473,34 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         Number of features this configuration will generate.
 
         Returns:
-            33 for single-interval mode
-            139 for multi-interval mode (33×3 intervals + 40 cross-interval)
-            91 for multi-interval with filter_redundancy=True (removes 48 features)
+            31 for single-interval mode
+            133 for multi-interval mode (31×3 intervals + 40 cross-interval)
+            85 for multi-interval with filter_redundancy=True (removes 48 features)
 
         Example:
             >>> config = ATRAdaptiveLaguerreRSIConfig()
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 33
+            >>> indicator.n_features  # 31
 
             >>> config = ATRAdaptiveLaguerreRSIConfig(multiplier_1=4, multiplier_2=12)
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
-            >>> indicator.n_features  # 139
+            >>> indicator.n_features  # 133
 
             >>> config_filtered = ATRAdaptiveLaguerreRSIConfig(
             ...     multiplier_1=4, multiplier_2=12, filter_redundancy=True
             ... )
             >>> indicator_filtered = ATRAdaptiveLaguerreRSI(config_filtered)
-            >>> indicator_filtered.n_features  # 91
+            >>> indicator_filtered.n_features  # 85
         """
         if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
-            # Multi-interval: 33×3 + 40 cross-interval = 139
-            # With redundancy filtering: 139 - 48 = 91
-            base_count = 139
+            # Multi-interval: 31×3 + 40 cross-interval = 133
+            # With redundancy filtering: 133 - 48 = 85
+            base_count = 133
             if self.config.filter_redundancy:
                 from .redundancy_filter import RedundancyFilter
                 return RedundancyFilter.n_features_after_filtering(base_count)
             return base_count
-        return 33  # Single-interval
+        return 31  # Single-interval
 
     @property
     def feature_mode(self) -> str:
