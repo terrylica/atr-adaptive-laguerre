@@ -14,7 +14,7 @@ Error Handling: raise_and_propagate (AbstractMethod raises TypeError)
 from abc import ABC, abstractmethod
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class FeatureConfig(BaseModel):
@@ -25,11 +25,10 @@ class FeatureConfig(BaseModel):
     Uses Pydantic for validation with strict mode.
     """
 
-    class Config:
-        """Pydantic configuration."""
-
-        strict = True
-        frozen = True  # Immutable after creation
+    model_config = ConfigDict(
+        strict=True,
+        frozen=True,  # Immutable after creation
+    )
 
 
 class BaseFeature(ABC):

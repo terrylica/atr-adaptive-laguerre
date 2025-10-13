@@ -13,7 +13,7 @@ Error Handling: raise_and_propagate (Pydantic raises ValidationError on invalid 
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OHLCVRecord(BaseModel):
@@ -86,11 +86,10 @@ class OHLCVRecord(BaseModel):
             raise ValueError(f"close_time ({v}) must be > date ({info.data['date']})")
         return v
 
-    class Config:
-        """Pydantic model configuration."""
-
-        strict = True  # Strict type validation
-        frozen = True  # Immutable after creation
+    model_config = ConfigDict(
+        strict=True,  # Strict type validation
+        frozen=True,  # Immutable after creation
+    )
 
 
 class OHLCVBatch(BaseModel):
@@ -120,8 +119,7 @@ class OHLCVBatch(BaseModel):
                 )
         return v
 
-    class Config:
-        """Pydantic model configuration."""
-
-        strict = True
-        frozen = True
+    model_config = ConfigDict(
+        strict=True,
+        frozen=True,
+    )

@@ -33,6 +33,7 @@
 The IC calculation was correlating `feature[t]` with **PAST** returns (from `t-k` to `t`) instead of **FUTURE** returns (from `t` to `t+k`).
 
 **Before Fix:**
+
 ```python
 # WRONG: Uses shift(k) which gives PAST prices
 forward_returns = np.log(prices / prices.shift(forward_periods))
@@ -41,6 +42,7 @@ forward_returns = np.log(prices / prices.shift(forward_periods))
 ```
 
 **After Fix:**
+
 ```python
 # CORRECT: Uses shift(-k) which gives FUTURE prices
 forward_returns = np.log(prices.shift(-forward_periods) / prices)
@@ -80,6 +82,7 @@ uv run python /tmp/verify_ic_fix.py
 **Status:** ✅ PASS
 
 **Algorithm:**
+
 1. Compute feature on full dataset
 2. For N progressive subsets (50%-100% length):
    - Compute feature on `df[:subset_length]`
@@ -88,6 +91,7 @@ uv run python /tmp/verify_ic_fix.py
 4. If values differ → look-ahead bias detected ❌
 
 **Test Results:**
+
 ```
 Test 1: Non-Anticipative Validation
 Validating feature is non-anticipative (50 progressive tests)...
@@ -99,6 +103,7 @@ Validating feature is non-anticipative (50 progressive tests)...
 **Implementation Review:**
 
 Main calculation loop (lines 190-219):
+
 ```python
 for i in range(len(df)):
     # Step 1: TR[i] uses close[i-1] ✅ Non-anticipative
@@ -125,6 +130,7 @@ for i in range(len(df)):
 **Status:** ✅ FIXED + VALIDATED
 
 **Test Results (After Fix):**
+
 ```
 Test 2: Information Coefficient (IC) Calculation
 Computing IC for 1-step-ahead log returns...
@@ -133,6 +139,7 @@ Computing IC for 1-step-ahead log returns...
 ```
 
 **Interpretation:**
+
 - Random walk synthetic data → IC ≈ 0 (expected) ✅
 - IC calculation now correctly measures predictive power for FUTURE returns ✅
 
@@ -145,17 +152,20 @@ Computing IC for 1-step-ahead log returns...
 **Status:** ✅ ACCEPTABLE (but different from walk-forward validation)
 
 **What It Does:**
+
 1. Split data by regime (volatility or trend strength)
 2. Compute IC on high regime subset
 3. Compute IC on low regime subset
 4. Validate IC > threshold on BOTH regimes
 
 **Important Clarification:**
+
 - OOD validation tests: "Does feature work in high AND low volatility?"
 - It does NOT test: "Train on past, test on future"
 - Regime subsets can be temporally interleaved (acceptable for regime testing)
 
 **Example:**
+
 ```
 Bars 0-100: Mix of high/low volatility throughout
 Low vol bars: [5, 12, 23, 45, 67, ...]  ← Can be scattered across time
@@ -178,17 +188,21 @@ This is VALID for regime testing, but NOT for temporal validation.
 **Risk:** Users may incorrectly validate features
 
 **What's Missing:**
+
 1. **Expanding window walk-forward:**
+
    ```python
    # Train on [0, T], test on (T, T+k], then expand to [0, T+k], test on (T+k, T+2k], etc.
    ```
 
 2. **Rolling window walk-forward:**
+
    ```python
    # Train on [T-w, T], test on (T, T+k], then slide window forward
    ```
 
 3. **Purged/embargoed splits:**
+
    ```python
    # Remove bars around train/test boundary to prevent leakage from autocorrelation
    ```
@@ -199,6 +213,7 @@ This is VALID for regime testing, but NOT for temporal validation.
    ```
 
 **Recommended Implementation:**
+
 - Use `sklearn.model_selection.TimeSeriesSplit` as baseline
 - Add purging/embargo logic from "Advances in Financial ML" (Marcos López de Prado)
 - Ensure all splits respect:
@@ -208,6 +223,7 @@ This is VALID for regime testing, but NOT for temporal validation.
   - Optional purge window for autocorrelation
 
 **Example Missing Utility:**
+
 ```python
 from atr_adaptive_laguerre.validation import walk_forward_validate
 
@@ -231,6 +247,7 @@ results = walk_forward_validate(
 **Risk:** Users may accidentally leak test data into training
 
 **What's Missing:**
+
 - Automated checks for:
   - Feature normalization using test data statistics
   - Global feature selection using test data
@@ -238,6 +255,7 @@ results = walk_forward_validate(
   - Cross-window data reuse
 
 **Recommended Implementation:**
+
 ```python
 from atr_adaptive_laguerre.validation import detect_train_test_leakage
 
@@ -298,16 +316,16 @@ uv run python -m test_validation
 
 ## Temporal Leakage Audit Summary
 
-| Component | Leakage Risk | Status | Notes |
-|-----------|-------------|--------|-------|
-| True Range calculation | ❌ None | ✅ PASS | Uses `close[i-1]` correctly |
-| ATR rolling state | ❌ None | ✅ PASS | Only looks back |
-| Adaptive coefficient | ❌ None | ✅ PASS | Derived from current ATR state |
-| Laguerre filter | ❌ None | ✅ PASS | Uses `close[i]` and past state |
-| Laguerre RSI | ❌ None | ✅ PASS | Uses current filter stages only |
-| IC calculation | ⚠️ **WAS CRITICAL** | ✅ FIXED | Now uses future returns correctly |
-| OOD regime split | ✅ Acceptable | ✅ PASS | Regime testing, not temporal |
-| Walk-forward validation | ⚠️ Missing | ⚠️ GAP | Users must implement |
+| Component               | Leakage Risk        | Status   | Notes                             |
+| ----------------------- | ------------------- | -------- | --------------------------------- |
+| True Range calculation  | ❌ None             | ✅ PASS  | Uses `close[i-1]` correctly       |
+| ATR rolling state       | ❌ None             | ✅ PASS  | Only looks back                   |
+| Adaptive coefficient    | ❌ None             | ✅ PASS  | Derived from current ATR state    |
+| Laguerre filter         | ❌ None             | ✅ PASS  | Uses `close[i]` and past state    |
+| Laguerre RSI            | ❌ None             | ✅ PASS  | Uses current filter stages only   |
+| IC calculation          | ⚠️ **WAS CRITICAL** | ✅ FIXED | Now uses future returns correctly |
+| OOD regime split        | ✅ Acceptable       | ✅ PASS  | Regime testing, not temporal      |
+| Walk-forward validation | ⚠️ Missing          | ⚠️ GAP   | Users must implement              |
 
 ---
 
@@ -322,6 +340,7 @@ uv run python -m test_validation
 ### Short-term (Recommended)
 
 1. **Add walk-forward validation utilities:**
+
    ```python
    # New file: src/atr_adaptive_laguerre/validation/walk_forward.py
    - TimeSeriesSplit wrapper
@@ -331,6 +350,7 @@ uv run python -m test_validation
    ```
 
 2. **Add usage examples:**
+
    ```python
    # New dir: examples/
    - examples/01_basic_usage.py
@@ -339,8 +359,10 @@ uv run python -m test_validation
    ```
 
 3. **Expand documentation:**
+
    ```markdown
    # New file: docs/walk_forward_guide.md
+
    - Proper train/test split methodology
    - Purging and embargo explained
    - Common pitfalls (global normalization, etc.)
@@ -358,23 +380,28 @@ uv run python -m test_validation
 ## Compliance with User Rules
 
 ✅ **Train on past; infer on future—never reuse training rows.**
+
 - Library ensures this via non-anticipative guarantee
 - IC now correctly tests future prediction
 - GAP: No walk-forward utilities to enforce temporal splits
 
 ✅ **Look-ahead allowed only within each training window (train-only).**
+
 - Feature calculation is strictly non-anticipative
 - No look-ahead in feature engineering ✅
 
 ✅ **Fit stats/transforms/feature selection/hyperparams on training only; freeze before inference.**
+
 - Feature is stateful and deterministic
 - GAP: No utilities to enforce this in validation framework
 
 ✅ **Walk-forward: for train=[t0,t1], test=(t1,t2]: fit → freeze → score → roll.**
+
 - GAP: Users must implement this themselves
 - Recommend adding `walk_forward_validate()` utility
 
 ✅ **Prefer SOTA library methods over custom algos.**
+
 - Uses scipy.stats.spearmanr ✅
 - Uses pandas rolling windows ✅
 - Uses numpy vectorized operations ✅
@@ -386,11 +413,13 @@ uv run python -m test_validation
 **Overall Assessment:** ✅ GOOD FOUNDATION + CRITICAL BUG FIXED + GAPS IDENTIFIED
 
 **Production Readiness:**
+
 - ✅ Core feature engineering: PRODUCTION READY (non-anticipative, efficient)
 - ✅ IC validation: PRODUCTION READY (after fix)
 - ⚠️ Walk-forward validation: USER RESPONSIBILITY (library provides no utilities)
 
 **Risk Level:**
+
 - 🟢 Low risk: Feature calculation (non-anticipative guarantee)
 - 🟢 Low risk: IC calculation (after fix)
 - 🟡 Medium risk: Users may implement incorrect walk-forward validation
