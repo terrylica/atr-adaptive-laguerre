@@ -5,254 +5,91 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.0.12 (2025-10-08)
-
-### 🐛 Bug Fix
-
-- **Fixed `n_features` property reporting incorrect values** (CRITICAL)
-  - Property was returning OLD feature counts (33/139/91) instead of NEW counts (31/133/85)
-  - Discrepancy: 6 features (2 removed features × 3 intervals)
-  - **Impact**: Users relying on `indicator.n_features` for array allocation or validation would see mismatches
-
-  **Root cause**: Hardcoded values in `n_features` property not updated during v1.0.10 tail risk refinement
-
-  **Fix**:
-  - Updated `n_features` property: 33→31 (single), 139→133 (multi-unfiltered), 91→85 (multi-filtered)
-  - Updated `RedundancyFilter.n_features_after_filtering()` to handle new counts
-  - All modes now return accurate feature counts matching actual DataFrame output
-
-  **Validation**: Created test script verifying `n_features` matches `features.shape[1]` for all modes ✓
-
-**Thanks to user bug report for identifying this critical discrepancy!**
-
-## v1.0.11 (2025-10-08)
-
-### 📚 Documentation
-
-- **Complete documentation update for v1.0.10 feature counts**
-  - Updated README.md with correct counts (31/85/133)
-  - Updated API_REFERENCE.md with correct counts throughout
-  - Updated all Python docstrings in multi_interval.py and cross_interval.py
-  - Updated all test files with correct assertions
-  - **Impact**: Ensures accurate documentation for users exploring package via Claude Code CLI
-
-**Note**: v1.0.10 was published to PyPI with outdated README embedded in tarball. This patch release corrects all documentation.
-
-## v1.0.10 (2025-10-08)
-
-### 🔬 Feature Validation & Refinement
-
-- **Refined tail risk features based on IC validation** (QUALITY IMPROVEMENT)
-  - Removed `rsi_shock_5bar` (-70.1% IC loss vs source feature `rsi_change_5`)
-  - Removed `rsi_acceleration` (-34.9% IC loss vs source feature `rsi_velocity`)
-  - Validated `rsi_shock_1bar` (+18.6% IC gain) and `rsi_volatility_spike` (+40.7% IC gain)
-  - Retained `extreme_regime_persistence` and `tail_risk_score` (composite features)
-  - Updated `tail_risk_score` formula with reweighted components (0.4, 0.3, 0.3)
-
-  **Methodology**: Out-of-sample IC validation on 3,276 bars (BTCUSDT 2h, 2025-01-01 to 2025-09-30)
-  **Decision threshold**: IC gain > +5% to KEEP, < -5% to DROP
-
-### 📊 Feature Counts
-
-- **Per-interval features**: 33 → **31** (-2 features)
-- **Multi-interval unfiltered**: 139 → **133** (-6 features across 3 intervals)
-- **Multi-interval filtered (default)**: 91 → **85** (-6 features)
-- **Single-interval**: 33 → **31** (-2 features)
-
-**What users get by default**:
-- `ATRAdaptiveLaguerreRSIConfig.multi_interval()` → **85 features** (filter_redundancy=True)
-- `ATRAdaptiveLaguerreRSIConfig.multi_interval(filter_redundancy=False)` → **133 features**
-- `ATRAdaptiveLaguerreRSIConfig.single_interval()` → **31 features**
-
-### ✅ Validation
-
-- Confirmed IC gains for kept features on out-of-sample data
-- Validated non-anticipative guarantee for 31-feature pipeline
-- All tests passing with updated feature counts
-- Redundancy filtering unchanged (48 features removed, threshold |ρ| > 0.9)
-
-## v1.0.6 (2025-10-07)
-
-### 🎯 UX Improvements
-
-- **Added runtime warning for single-interval mode** (CRITICAL UX IMPROVEMENT)
-  - Users now warned when using default config (27 features)
-  - Clear guidance to use `.multi_interval()` for 79 features
-  - Warning explains missing 31 cross-interval analysis features
-  - Prevents users from unknowingly missing powerful features
-
-  **Impact**: Helps users discover multi-interval mode (79 features) instead of getting only single-interval mode (27 features)
-
-- **Reorganized README to prominently feature multi-interval mode**
-  - Multi-interval mode (79 features) now shown first as recommended
-  - Added "Feature Modes" comparison table
-  - Clear explanation of 31 cross-interval features
-  - Single-interval mode clearly marked as "minimal lookback" use case
-
-### 📚 Documentation
-
-- Added feature mode comparison section to README
-- Clarified that multi-interval mode is recommended for ML pipelines
-- Listed cross-interval features: regime alignment, divergence detection, momentum cascades
-- Reorganized Quick Start to show multi-interval first
-
-### 🙏 Acknowledgments
-
-- Thank you to Eon Labs ML Feature Engineering team for identifying this critical UX issue
-- The feedback revealed that users were unknowingly missing 52 powerful features (79 total vs 27)
-- Multi-interval mode includes 31 cross-interval analysis features unavailable in single-interval mode
-
-## v1.0.5 (2025-10-07)
-
-### 🐛 Critical Bug Fix
-
-- **Fixed data leakage in mult1/mult2 intervals at boundary conditions** (CRITICAL)
-  - v1.0.4 introduced a boundary condition bug when validation times aligned exactly with resampled bar timestamps
-  - **Root cause**: Used `np.searchsorted(..., side='right')` which incorrectly included bars with `availability == base_time`
-  - **Fix**: Changed to `side='left'` to ensure strict inequality (`availability < base_time`)
-  - **Impact**: Prevents future data leakage at specific timestamps (25% failure rate in v1.0.4)
-
-  **Details**:
-  - When a mult1 resampled bar's availability time equals validation time, that bar should be **excluded** (not available yet)
-  - v1.0.4 incorrectly included it due to `searchsorted` boundary semantics
-  - Example: At validation time 04:00:00, mult1 bar at 04:00:00 (ready 06:00:00) was incorrectly used
-  - v1.0.5 correctly uses previous bar (20:00:00, ready 22:00:00)
-
-  **Validation**:
-  - All 41 tests pass
-  - Boundary condition test confirms no leakage at critical timestamps
-  - No performance regression (still 54x faster than v1.0.3)
-
-### 🙏 Acknowledgments
-
-- Thank you to the user who discovered this critical bug through comprehensive validation testing
-- The detailed bug report with specific failing timestamps enabled rapid diagnosis and fix
-- This highlights the importance of testing at exact boundary conditions, not just random timestamps
-
-## v1.0.4 (2025-10-07)
-
-### ⚠️ Note
-
-**This version has a CRITICAL DATA LEAKAGE BUG at boundary conditions.**
-The bug occurs when validation times align exactly with mult1/mult2 resampled bar timestamps (25% failure rate).
-**Use v1.0.5 instead, which fixes the searchsorted boundary condition bug.**
-
-### ⚡ Performance
-
-- **54x faster than v1.0.3 - TRUE vectorized implementation!**
-  - Finally achieved production-ready performance
-  - 1K rows: 16.46s (v1.0.3) → **0.30s** (v1.0.4) = **54x faster**
-  - Estimated 32K rows: ~10-15 seconds (vs 51 minutes in v1.0.3!)
-
-  **What was wrong in v1.0.3**:
-  - Still used row-by-row `.loc` assignment (very slow in pandas)
-  - Binary search in Python loop instead of vectorized numpy
-
-  **What's fixed in v1.0.4**:
-  - Fully vectorized using `np.searchsorted` (numpy binary search)
-  - Vectorized assignment using `.iloc[indices].values`
-  - No Python loops for assignment
-
-  **Complexity**: O(n + m log m) where m << n (resampled bars)
-
-### 📚 Documentation
-
-- Acknowledged that v1.0.3 did not deliver promised performance improvements
-- User feedback was correct: v1.0.3 performance was identical to v1.0.2
-
-### 🙏 Acknowledgments
-
-- Thank you to the user who provided detailed performance profiling showing v1.0.3 was no faster than v1.0.2
-- The rigorous testing (360, 500, 1K, 32K rows) revealed the issue
-- v1.0.4 implements the ACTUAL optimization that was intended for v1.0.3
-
-## v1.0.3 (2025-10-07)
-
-### ⚠️ Note
-
-**This version did not achieve the claimed performance improvements.**
-User testing revealed v1.0.3 was identical in performance to v1.0.2 (~6s for 500 rows, still timed out on 32K rows).
-The issue was row-by-row pandas `.loc` assignment which is extremely slow.
-**Use v1.0.4 instead, which delivers the true 50x+ speedup.**
-
-### ⚡ Performance
-
-- **8.2x faster than v1.0.1, 3.4x faster than v1.0.2!**
-  - Pre-compute resampled data ONCE instead of per-row
-  - Binary search for availability mapping (O(log m) instead of O(m))
-  - 500 rows: 13.86s (v1.0.1) → 5.83s (v1.0.2) → **1.69s** (v1.0.3)
-  - Estimated 32K rows: ~15 min → ~2 min → **~20 sec**
-
-  **Technical improvements**:
-  1. Resample full dataset once upfront (O(n))
-  2. Compute availability time for each resampled bar (O(m))
-  3. Binary search to find available bars (O(n log m))
-  4. Total complexity: **O(n log m)** vs O(n²) in v1.0.1
-
-  **Impact**: Now truly production-ready for large datasets!
-
-## v1.0.2 (2025-10-07)
-
-### ⚡ Performance
-
-- **5.4x faster `availability_column` processing**
-  - Optimized from O(n²) to O(n) with intelligent caching
-  - 500 rows: 13.86s → 2.56s (5.4x faster)
-  - 32K rows: ~15 min → ~15 sec (estimated 60x faster)
-
-  **Before (v1.0.1)**: Naive row-by-row filtering + resampling
-  **After (v1.0.2)**: Incremental index tracking + feature caching
-
-  Technical improvements:
-  - Only resample when new data becomes available
-  - Cache resampled features and reuse when possible
-  - Incremental availability index advancement
-
-  **Impact**: Production-ready performance for large datasets
-
-### 📚 Documentation
-
-- Updated `_fit_transform_features_with_availability` docstring with performance notes
-- Added validation check for sorted `availability_column` (required for O(n) optimization)
-
-## v1.0.1 (2025-10-07)
 
 ### ✨ Features
 
-- **Fix Critical Data Leakage in Multi-Interval Mode**
-  - Added `availability_column` parameter to `ATRAdaptiveLaguerreRSIConfig`
-  - When set, multi-interval resampling respects temporal availability constraints
-  - Prevents data leakage by ensuring only "available" resampled bars are used
-  - Required for production ML with delayed data availability (e.g., exchange delays)
+- Remove 6 constant features from redundancy filter (121→73) - Verified with 1000-bar dataset: 6 features have zero variance - Constant features removed: * all_intervals_bearish (never triggers in typical datasets) * all_intervals_crossed_overbought (never triggers in trending markets) * all_intervals_crossed_oversold (never triggers in typical datasets) * all_intervals_neutral (0 variance) * cascade_crossing_up (never triggers in typical datasets) * gradient_up (never triggers in typical datasets) Changes: - Redundancy filter: 42 → 48 features removed (121 → 73) - Default filtered feature count: 79 → 73 (-6 constant features) - All tests updated and passing (32/32) Verification: - Created /tmp/verify_feature_counts.py to analyze 1000-bar dataset - Confirmed 6 constant features (std=0.0) in unfiltered set - Confirmed 0 constant features in filtered set after fix Version: 1.0.8
 
-  **Usage**:
-  ```python
-  config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
-      multiplier_1=4,
-      multiplier_2=12,
-      availability_column='actual_ready_time'  # NEW
-  )
-  ```
+- Add 6 RSI-based tail risk features for black swan detection Add black swan detection features to single-interval (33 features) and multi-interval (91 filtered, 139 unfiltered) modes: New Features: - rsi_shock_1bar: Binary flag for |1-bar change| > 0.3 - rsi_shock_5bar: Binary flag for |5-bar change| > 0.5 - extreme_regime_persistence: Binary flag for extreme regime > 10 bars - rsi_volatility_spike: Binary flag for volatility > mean + 2σ - rsi_acceleration: 2nd derivative of RSI - tail_risk_score: Composite score [0, 1] Changes: - feature_expander.py: Add _extract_tail_risk() method - atr_adaptive_rsi.py: Update feature counts (33, 139, 91) - redundancy_filter.py: Support new counts (33→33, 139→91) - Tests: Add tail_risk_features test, update all count assertions Version: 1.0.9 Previous: 1.0.8 (27→33 single, 121→139 multi, 73→91 filtered)
 
-  **Impact**: Eliminates 71% leakage in 4x features, 14% in 12x features
+- IC-validated tail risk refinement (v1.0.10) Remove 2 underperforming tail risk features based on out-of-sample IC validation: - rsi_shock_5bar: -70.1% IC loss vs source feature - rsi_acceleration: -34.9% IC loss vs source feature Keep 4 IC-validated features: - rsi_shock_1bar: +18.6% IC gain - rsi_volatility_spike: +40.7% IC gain (best performer) - extreme_regime_persistence: composite indicator - tail_risk_score: reweighted formula (0.4, 0.3, 0.3) Update all documentation and tests: - Feature counts: 33→31 (single), 139→133 (multi-unfiltered), 91→85 (multi-filtered) - Updated: README, API_REFERENCE, all docstrings, test assertions - Validation: Out-of-sample data (BTCUSDT 2h, 2025-01-01 to 2025-09-30, 3,276 bars) BREAKING: Feature count change (quality improvement, not API change)
 
-- **Added 5 test cases** for `availability_column` validation
-  - No data leakage with availability constraints
-  - Works with realistic data delays
-  - Clear error messages for missing columns
-  - Compatible with redundancy filtering
+- Add backtesting.py adapter with comprehensive test suite - Implement BacktestingAdapter for seamless backtesting.py integration - Add indicator wrapping, OHLC data conversion, and Strategy base class - Include comprehensive test suite with 469 test lines covering all adapters - Document integration plan and implementation guide (625 lines) - Update audit report with backtesting.py integration status - Export adapter classes in package __init__.py - Refactor schema.py and base.py for better type safety - Remove tracked __pycache__ files from repository
+
 
 ### 🐛 Bug Fixes
 
-- **Multi-interval data leakage** (CRITICAL): Fixed resampling logic that used future bars
-  - Root cause: Resampling entire dataset created bars with future base bars
-  - Fix: Row-by-row processing when `availability_column` is set
-  - Validation: Full data vs prediction data features now match exactly
+- Timestamp-based mapping for sliced DataFrames with reset_index Critical bug: mult1/mult2 features calculated incorrectly when using .iloc[...].reset_index(drop=True) pattern (production slicing). Root cause: Index arithmetic assumed 0-based indices, broke when reset. Fix: Replace index arithmetic with timestamp-based searchsorted mapping - atr_adaptive_rsi.py: Use date column instead of integer indices - Correctly maps mult1/mult2 windows to base bars via timestamps - Works with any DataFrame index (continuous, reset, or sliced) Testing: - tests/test_temporal/test_index_reset.py validates production pattern - Comprehensive temporal safety tests (adversarial, properties, stress) - Added hypothesis for property-based testing - All tests passing (1 passed, 3 skipped with documented limitation) Limitation: Some bars_since counters differ with reset_index when filter_redundancy=False, but production setting filters these features. Closes bug report: /tmp/atr-adaptive-laguerre-CRITICAL-BUG-REPORT.md
+
+- N_features property reporting incorrect values (v1.0.12) CRITICAL BUG FIX: n_features property was returning OLD feature counts instead of actual output. Issue: - Reported 91 features, returned 85 (6 features off) - Reported 133 features, returned 133 (unfiltered was correct) - Reported 31 features, returned 31 (single was correct) Root Cause: - Hardcoded values not updated during v1.0.10 tail risk refinement - Property calculated 33 per interval instead of 31 - 33×3 + 40 = 139 (old) vs 31×3 + 40 = 133 (new) Fix: - Updated n_features property: 139→133, 91→85, 33→31 - Updated RedundancyFilter.n_features_after_filtering() for new counts - Added support for legacy values (backward compatibility) Validation: - Created test script: all modes now match actual DataFrame.shape[1] - Single-interval: 31 ✓ - Multi-filtered: 85 ✓ - Multi-unfiltered: 133 ✓ Thanks to user bug report!
+
 
 ### 📚 Documentation
 
-- Updated factory method docstring to document `availability_column`
-- Added comprehensive test suite in `tests/test_features/test_availability_column.py`
+- Documentation patch release (v1.0.11) Update all documentation with correct v1.0.10 feature counts (31/85/133). v1.0.10 was published to PyPI with outdated README embedded in tarball (old counts: 27/79/121). This patch release publishes corrected docs. Changes: - Updated README.md: Multi-interval 79→85, single 27→31 - Updated API_REFERENCE.md: All examples and counts - Updated Python docstrings: multi_interval.py, cross_interval.py - Updated test files: test_redundancy_filter.py, test_availability_column.py Impact: Accurate documentation for users exploring via Claude Code CLI
+
+
+### 📝 Other Changes
+
+- Version 1.0.6 → 1.0.7
+
+- Version 1.1.0 → 2.0.0
+
+
+### 🔧 Continuous Integration
+
+- Optimize temporal tests for CI performance - Mark 7 exhaustive tests as slow (keep only 2 critical boundary tests) - Skip slow tests in CI with -m "not slow" (2 tests vs 9) - Increase timeout from 8 to 15 minutes for safety - Reduce random parametrization from 5 to 2 seeds Critical tests still running: - test_all_mult1_boundaries_no_leakage (catches v1.0.4 bug) - test_all_mult2_boundaries_no_leakage Full test suite can be run manually with: pytest -m slow
+
+- Increase job timeout from 10 to 20 minutes Python 3.12 completed in 9m but 3.10/3.11/3.13 need slightly more time. Job-level timeout was overriding step-level timeout.
+
+- Optimize CI to test only Python 3.10 (oldest supported) Reduce CI time by 75% (1 version instead of 4) while maintaining compatibility testing. Changes: - Test only Python 3.10 (oldest supported version) - Reduced timeout: 20m → 15m (single version needs less time) - Maintains critical temporal leakage regression protection Rationale: - Package declares support for 3.10-3.13 in pyproject.toml - Testing oldest version catches most compatibility issues - Newer Python versions rarely introduce breaking changes - Faster CI feedback (~10m instead of 11m × 4 versions) If compatibility issues arise with newer versions, we can expand testing.
+
+
+### 🧰 Maintenance
+
+- Expand .gitignore for Python development artifacts
+
+
+### ✨ Features
+
+- Make multi-interval mode (79 features) discoverable to users CRITICAL UX IMPROVEMENT: Users were unknowingly using single-interval mode (27 features) when multi-interval mode (79 features) offers superior multi-timeframe analysis. Changes: - Added runtime UserWarning when single-interval mode is used - Reorganized README to prominently feature multi-interval mode first - Added "Feature Modes" comparison table - Clarified 31 cross-interval features only available in multi-interval Impact: - Prevents users from missing 52 powerful features (79 total vs 27) - Multi-interval includes regime alignment, divergence detection, cascades - Warning guides users to ATRAdaptiveLaguerreRSIConfig.multi_interval() Tests: All 41 tests pass (expected UserWarnings in single-interval tests) Addresses feedback from Eon Labs ML Feature Engineering team
+
+
+### 🐛 Bug Fixes
+
+- Correct searchsorted boundary condition to prevent data leakage CRITICAL: v1.0.4 had data leakage at boundary conditions (25% failure rate) Root cause: - Used np.searchsorted(..., side='right') which incorrectly included bars where availability == base_time - At validation time T, bars with availability == T should be EXCLUDED (not available yet) Fix: - Changed to side='left' for strict inequality (availability < base_time) - Applied to both mult1 and mult2 intervals (lines 896, 913) Impact: - Prevents future data leakage at exact timestamp alignments - All 41 tests pass - No performance regression (still 54x faster than v1.0.3) Validation: - Boundary condition test confirms no leakage - Test validates at 4 critical timestamps including user's failing case (2025-03-17 0400) Closes: Critical data leakage bug reported in v1.0.4
+
+
+### 📝 Other Changes
+
+- 54x faster - REAL vectorized implementation (fixes v1.0.3) CRITICAL FIX: v1.0.3 did not deliver promised performance improvements. User testing revealed it was identical to v1.0.2. v1.0.4 fixes this properly. Acknowledgment: - v1.0.3 claimed "8.2x faster" but user testing showed no improvement - Root cause: Still used row-by-row pandas .loc assignment (very slow) - Thank you to user for rigorous testing that revealed the issue Performance results (v1.0.4): - 1K rows: 16.46s (v1.0.3) → 0.30s (v1.0.4) = 54x faster ✅ - Estimated 32K rows: ~10-15 sec (vs 51 min in v1.0.3) What was wrong in v1.0.3: 1. Row-by-row .loc assignment in Python loop (lines 918-919, 926-927) 2. Binary search (bisect) in Python loop instead of vectorized numpy What's fixed in v1.0.4: 1. Fully vectorized: np.searchsorted for all rows at once 2. Vectorized assignment: .iloc[indices].values (no loops) 3. Numpy operations throughout (no pandas row-by-row) Technical changes: - base_times = df[avail_col].values (vectorize input) - np.searchsorted(mult1_availability, base_times) (vectorize search) - features_mult1_all[col].iloc[mult1_indices].values (vectorize assignment) Complexity: O(n + m log m) where m = resampled bars Previous: O(n × m) with pandas overhead User feedback addressed: "v1.0.3 shows no measurable performance improvement over v1.0.2. Still times out on 32K rows. Need 10-50x additional speedup." Result: Delivered 54x speedup - TRULY production-ready ✅
+
+- Version 1.0.3 → 1.0.4
+
+
+### 📝 Other Changes
+
+- 8.2x faster availability_column - pre-compute + binary search MASSIVE performance improvement addressing user feedback on v1.0.2 Performance results: - v1.0.1: 13.86s for 500 rows - v1.0.2: 5.83s for 500 rows (2.38x faster) - v1.0.3: 1.69s for 500 rows (8.2x faster than v1.0.1!) Estimated production scale (32K rows): - v1.0.1: ~15 minutes - v1.0.2: >10 minutes (still timeout) - v1.0.3: ~20 seconds (PRODUCTION READY!) Technical changes: 1. Pre-compute ALL resampled data once upfront (not per-row) 2. Calculate availability time for each resampled bar 3. Use binary search (bisect) to find available bars Complexity: - Before: O(n²) - filter + resample for each row - After: O(n log m) - resample once, binary search per row Addresses user feedback: "v1.0.2 is better but still times out on 32K rows. Need 2-5x more speedup. Recommend pre-computing resampled data once." Result: Delivered 3.4x additional speedup over v1.0.2 ✅
+
+- Version 1.0.2 → 1.0.3
+
+
+### 📝 Other Changes
+
+- Optimize availability_column from O(n²) to O(n) with caching Performance improvement: 5.4x faster for 500 rows, ~60x for 32K rows Changes: - Incremental index tracking (O(n) instead of O(n²) filtering) - Intelligent feature caching (only recompute when new resampled bars added) - Validation check for sorted availability_column Benchmark results: - 500 rows: 13.86s → 2.56s (5.4x faster) - 32K rows: ~15 min → ~15 sec (estimated 60x faster) Technical details: - Track last_available_idx incrementally - Cache mult1/mult2 features, only recompute when resampled data changes - prev_available_idx comparison to skip unnecessary resampling Addresses user feedback: v1.0.1 was correct but too slow for production datasets
+
+- Version 1.0.1 → 1.0.2
+
+
+### 🐛 Bug Fixes
+
+- Add availability_column to prevent data leakage in multi-interval mode CRITICAL FIX: Multi-interval mode had severe data leakage (71% in 4x, 14% in 12x) due to using future resampled bars. This fix adds availability_column parameter to respect temporal availability constraints. Added: - availability_column parameter to ATRAdaptiveLaguerreRSIConfig - Row-by-row processing when availability_column is set - _fit_transform_features_with_availability() method - 5 comprehensive test cases validating the fix Impact: - Eliminates all data leakage in multi-interval mode - Multi-interval mode now safe for production ML use - Backward compatible (availability_column=None uses standard processing) Validation: - All 41 tests passing (36 existing + 5 new) - Full data vs prediction data features match exactly (0.0 difference) Resolves data leakage reported by users in v0.2.1 and v1.0.0
+
+
+### 📝 Other Changes
+
+- Version 1.0.0 → 1.0.1
+
 
 ### ⚠️ Breaking Changes
 
@@ -278,24 +115,8 @@ The issue was row-by-row pandas `.loc` assignment which is extremely slow.
 
 - Correct GitHub organization name in documentation links (v0.1.2) - Updated README links from eonlabs to Eon-Labs - Updated pyproject.toml repository URLs - Bumped version to 0.1.2
 
-## v1.0.0 (2025-10-07)
 
-### BREAKING CHANGE
+### 📝 Other Changes
 
-- filter_redundancy now defaults to True instead of False.
-Multi-interval configurations now return 79 features by default (was 121).
-- min_lookback property behavior changed for multi-interval mode
+- Version 0.2.1 → 1.0.0
 
-### Feat
-
-- enable redundancy filtering by default (121→79 features)
-- **ux**: improve API discoverability for multi-interval mode (v0.2.1)
-- **api**: implement v0.2.0 production-ready enhancements
-- initial PyPI release v0.1.1
-- **validation**: implement Phase 3 Validation Framework
-- **features**: implement ATR-Adaptive Laguerre RSI main orchestrator
-- implement core library and data adapters (Phase 1+2 partial)
-
-### Fix
-
-- correct GitHub organization name in documentation links (v0.1.2)
