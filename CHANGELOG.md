@@ -120,3 +120,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Version 0.2.1 → 1.0.0
 
+## v3.0.0 (2025-10-16)
+
+### BREAKING CHANGE
+
+- API changed from plain functions to Pydantic models
+- atr_laguerre_indicator(data, atr_period=14) → compute_indicator(config, data)
+- atr_laguerre_features(data, feature_name="rsi") → compute_feature(config, data)
+- make_atr_laguerre_indicator(atr_period=20) → make_indicator(atr_period=20)
+
+### Feat
+
+- adopt Pydantic API documentation standard for backtesting adapter
+- add backtesting.py adapter with comprehensive test suite
+- IC-validated tail risk refinement (v1.0.10)
+- add 6 RSI-based tail risk features for black swan detection
+- remove 6 constant features from redundancy filter (121→73)
+
+### Fix
+
+- n_features property reporting incorrect values (v1.0.12)
+- timestamp-based mapping for sliced DataFrames with reset_index
+
+## v1.0.6 (2025-10-07)
+
+### Feat
+
+- make multi-interval mode (79 features) discoverable to users
+
+## v1.0.5 (2025-10-07)
+
+### Fix
+
+- correct searchsorted boundary condition to prevent data leakage
+
+## v1.0.4 (2025-10-07)
+
+### Perf
+
+- 54x faster - REAL vectorized implementation (fixes v1.0.3)
+
+## v1.0.3 (2025-10-07)
+
+### Perf
+
+- 8.2x faster availability_column - pre-compute + binary search
+
+## v1.0.2 (2025-10-07)
+
+### Perf
+
+- optimize availability_column from O(n²) to O(n) with caching
+
+## v1.0.1 (2025-10-07)
+
+### Fix
+
+- add availability_column to prevent data leakage in multi-interval mode
+
+## v1.0.0 (2025-10-07)
+
+### BREAKING CHANGE
+
+- filter_redundancy now defaults to True instead of False.
+Multi-interval configurations now return 79 features by default (was 121).
+- min_lookback property behavior changed for multi-interval mode
+
+### Feat
+
+- enable redundancy filtering by default (121→79 features)
+- **ux**: improve API discoverability for multi-interval mode (v0.2.1)
+- **api**: implement v0.2.0 production-ready enhancements
+- initial PyPI release v0.1.1
+- **validation**: implement Phase 3 Validation Framework
+- **features**: implement ATR-Adaptive Laguerre RSI main orchestrator
+- implement core library and data adapters (Phase 1+2 partial)
+
+### Fix
+
+- correct GitHub organization name in documentation links (v0.1.2)
