@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+### ⚠️ Breaking Changes
+
+- Adopt Pydantic API documentation standard for backtesting adapter Refactor backtesting.py adapter to three-layer Pydantic pattern: - Layer 1: FeatureNameType Literal with 31 feature names - Layer 2: IndicatorConfig and FeatureConfig models with Field descriptions - Layer 3: Rich docstrings with Examples sections BREAKING CHANGE: API changed from plain functions to Pydantic models - atr_laguerre_indicator(data, atr_period=14) → compute_indicator(config, data) - atr_laguerre_features(data, feature_name="rsi") → compute_feature(config, data) - make_atr_laguerre_indicator(atr_period=20) → make_indicator(atr_period=20) Benefits: - Single source of truth (code = documentation) - AI-discoverable via JSON Schema - Runtime validation at config creation time - Immutable configs (frozen=True) - Field-level descriptions for IDE autocomplete Test results: 29 passed, 96% adapter coverage, 91% models coverage Migration guide: docs/backtesting-py-integration-plan.md (v2.0.0 section) [**breaking**]
+
+
 ### ✨ Features
 
 - Remove 6 constant features from redundancy filter (121→73) - Verified with 1000-bar dataset: 6 features have zero variance - Constant features removed: * all_intervals_bearish (never triggers in typical datasets) * all_intervals_crossed_overbought (never triggers in trending markets) * all_intervals_crossed_oversold (never triggers in typical datasets) * all_intervals_neutral (0 variance) * cascade_crossing_up (never triggers in typical datasets) * gradient_up (never triggers in typical datasets) Changes: - Redundancy filter: 42 → 48 features removed (121 → 73) - Default filtered feature count: 79 → 73 (-6 constant features) - All tests updated and passing (32/32) Verification: - Created /tmp/verify_feature_counts.py to analyze 1000-bar dataset - Confirmed 6 constant features (std=0.0) in unfiltered set - Confirmed 0 constant features in filtered set after fix Version: 1.0.8

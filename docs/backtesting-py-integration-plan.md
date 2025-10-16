@@ -253,8 +253,167 @@ Estimated: 2-3 hours
 - Phase 4: 30 min
 - Phase 5: 15 min
 
+---
+
+## v2.0.0: Pydantic API Documentation Standard Refactor
+
+**Version**: 2.0.0
+**Created**: 2025-10-13
+**Status**: ✅ COMPLETED
+**Breaking Change**: YES - API changed from plain functions to Pydantic models
+
+### Motivation
+
+Adopt Pydantic API Documentation Standard (industry standard: 8000+ PyPI packages, 360M+ downloads/month) for:
+- Single source of truth (code = documentation)
+- AI-discoverable via JSON Schema
+- Runtime validation at parameter construction time
+- Field-level descriptions for machine-readable docs
+- Eliminates README/AGENTS.md fragmentation
+
+### Architecture Changes
+
+**Three-Layer Pattern**:
+
+**Layer 1**: Literal types define valid parameter values
+```python
+# backtesting_models.py
+FeatureNameType = Literal[
+    "rsi", "regime", "regime_bearish", "regime_neutral",
+    # ... all 31 features
+]
+```
+
+**Layer 2**: Pydantic models with Field descriptions
+```python
+class IndicatorConfig(BaseModel):
+    atr_period: int = Field(
+        default=14, ge=10, le=30,
+        description="ATR lookback period for volatility adaptation..."
+    )
+    # ... all parameters with validation and descriptions
+
+    model_config = ConfigDict(frozen=True, json_schema_extra={...})
+
+class FeatureConfig(BaseModel):
+    feature_name: FeatureNameType = Field(...)
+    # ... inherits indicator parameters
+```
+
+**Layer 3**: Rich docstrings in adapter functions
+```python
+def compute_indicator(config: IndicatorConfig, data: Any) -> np.ndarray:
+    """
+    Compute ATR-Adaptive Laguerre RSI indicator for backtesting.py Strategy.I().
+
+    Examples:
+        >>> from atr_adaptive_laguerre import IndicatorConfig, compute_indicator
+        >>> config = IndicatorConfig()
+        >>> class MyStrategy(Strategy):
+        ...     def init(self):
+        ...         self.rsi = self.I(compute_indicator, config, self.data)
+    """
+```
+
+### Breaking Changes
+
+**v1.1.0 API (DEPRECATED)**:
+```python
+# Plain function parameters
+result = atr_laguerre_indicator(data, atr_period=14, smoothing_period=5)
+result = atr_laguerre_features(data, feature_name="rsi")
+indicator = make_atr_laguerre_indicator(atr_period=20)
+```
+
+**v2.0.0 API (NEW)**:
+```python
+# Pydantic model parameters
+config = IndicatorConfig(atr_period=14, smoothing_period=5)
+result = compute_indicator(config, data)
+
+config = FeatureConfig(feature_name="rsi")
+result = compute_feature(config, data)
+
+indicator = make_indicator(atr_period=20)  # Validates at creation
+```
+
+### Implementation
+
+**New Files**:
+1. `src/atr_adaptive_laguerre/backtesting_models.py` (22 statements, 91% coverage)
+   - `FeatureNameType` Literal with 31 feature names
+   - `IndicatorConfig` Pydantic model
+   - `FeatureConfig` Pydantic model with `supported_features()` helper
+
+**Updated Files**:
+1. `src/atr_adaptive_laguerre/backtesting_adapter.py` (46 statements, 96% coverage)
+   - `atr_laguerre_indicator()` → `compute_indicator(config, data)`
+   - `atr_laguerre_features()` → `compute_feature(config, data)`
+   - `make_atr_laguerre_indicator()` → `make_indicator()` with validation
+
+2. `src/atr_adaptive_laguerre/__init__.py`
+   - Version: 1.1.0 → 2.0.0
+   - Exports: `IndicatorConfig`, `compute_indicator`, `compute_feature`, `make_indicator`
+   - Note: backtesting `FeatureConfig` not exported at top level (naming collision with core `FeatureConfig`)
+
+3. `tests/test_backtesting_adapter.py`
+   - Updated all 29 tests (was 28 tests, added 1 validation test)
+   - Updated imports and all function calls
+   - New test: `test_factory_validates_parameters()` - validates Pydantic enforcement
+
+### Test Results
+
+```
+29 passed in 2.48s
+Coverage: 96% backtesting_adapter.py, 91% backtesting_models.py
+0 warnings
+```
+
+**All SLO guarantees maintained**:
+- ✅ Correctness: Column mapping bidirectional accuracy 100%
+- ✅ Correctness: Non-anticipative property maintained 100%
+- ✅ Correctness: Output value range [0.0, 1.0]: 100%
+- ✅ Correctness: Output length matches input length: 100%
+- ✅ Observability: Clear error messages + Pydantic ValidationError
+- ✅ Maintainability: Single source of truth, AI-discoverable schema
+
+### Migration Guide
+
+**For users on v1.x**:
+
+```python
+# Before (v1.x)
+from atr_adaptive_laguerre import atr_laguerre_indicator
+class MyStrategy(Strategy):
+    def init(self):
+        self.rsi = self.I(atr_laguerre_indicator, self.data, atr_period=20)
+
+# After (v2.x)
+from atr_adaptive_laguerre import IndicatorConfig, compute_indicator
+class MyStrategy(Strategy):
+    def init(self):
+        config = IndicatorConfig(atr_period=20)
+        self.rsi = self.I(compute_indicator, config, self.data)
+```
+
+**Benefits of upgrade**:
+- Parameter validation at config creation time (fail fast)
+- IDE autocomplete for all parameters
+- Field-level descriptions via `help(IndicatorConfig)`
+- JSON Schema generation via `IndicatorConfig.model_json_schema()`
+- Immutable configs (frozen=True prevents accidental mutation)
+
+### References
+
+- Pydantic v2 docs: https://docs.pydantic.dev/latest/
+- User specification: `~/.claude/specifications/pydantic-api-documentation-standard.yaml`
+- Industry adoption: OpenAI SDK, Anthropic SDK, Google ADK, FastAPI, LangChain
+
+---
+
 ## References
 
 - backtesting.py docs: https://kernc.github.io/backtesting.py/
 - API probe results: `/tmp/probe/` (ephemeral, captured in plan)
 - Research report: Task agent output (2025-10-10)
+- Pydantic standard: `~/.claude/specifications/pydantic-api-documentation-standard.yaml`
