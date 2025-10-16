@@ -50,3 +50,4 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+RELEASE_NOTES_SHORT.md

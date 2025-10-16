@@ -4,7 +4,7 @@ ATR-Adaptive Laguerre RSI Feature Engineering Library.
 Non-anticipative volatility-adaptive momentum indicator for seq-2-seq forecasting.
 """
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 
 # Core components
 from atr_adaptive_laguerre.core import (  # noqa: F401
@@ -37,12 +37,18 @@ from atr_adaptive_laguerre.validation import (  # noqa: F401
     validate_ood_robustness,
 )
 
-# backtesting.py adapter
+# backtesting.py adapter (v2.0.0 Pydantic API)
 from atr_adaptive_laguerre.backtesting_adapter import (  # noqa: F401
-    atr_laguerre_features,
-    atr_laguerre_indicator,
-    make_atr_laguerre_indicator,
+    compute_feature,
+    compute_indicator,
+    make_indicator,
 )
+from atr_adaptive_laguerre.backtesting_models import (  # noqa: F401
+    IndicatorConfig,
+)
+# Note: backtesting_models.FeatureConfig not exported at top level to avoid
+# collision with features.FeatureConfig. Import explicitly if needed:
+# from atr_adaptive_laguerre.backtesting_models import FeatureConfig
 
 __all__ = [
     # Core
@@ -66,8 +72,9 @@ __all__ = [
     "calculate_information_coefficient",
     "validate_information_coefficient",
     "validate_ood_robustness",
-    # backtesting.py adapter
-    "atr_laguerre_indicator",
-    "atr_laguerre_features",
-    "make_atr_laguerre_indicator",
+    # backtesting.py adapter (v2.0.0 Pydantic API)
+    "IndicatorConfig",
+    "compute_indicator",
+    "compute_feature",
+    "make_indicator",
 ]

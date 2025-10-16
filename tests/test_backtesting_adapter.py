@@ -14,9 +14,13 @@ import pandas as pd
 import pytest
 
 from atr_adaptive_laguerre.backtesting_adapter import (
-    atr_laguerre_features,
-    atr_laguerre_indicator,
-    make_atr_laguerre_indicator,
+    compute_feature,
+    compute_indicator,
+    make_indicator,
+)
+from atr_adaptive_laguerre.backtesting_models import (
+    FeatureConfig,
+    IndicatorConfig,
 )
 
 
@@ -74,12 +78,13 @@ def sample_ohlcv_lowercase():
     return df
 
 
-class TestATRLaguerreIndicator:
-    """Test atr_laguerre_indicator function."""
+class TestComputeIndicator:
+    """Test compute_indicator function with Pydantic API."""
 
     def test_basic_computation_with_titlecase(self, sample_ohlcv_titlecase):
         """Test basic indicator computation with Title case columns."""
-        result = atr_laguerre_indicator(sample_ohlcv_titlecase)
+        config = IndicatorConfig()
+        result = compute_indicator(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -88,7 +93,8 @@ class TestATRLaguerreIndicator:
 
     def test_basic_computation_with_lowercase(self, sample_ohlcv_lowercase):
         """Test that lowercase columns also work (mixed case support)."""
-        result = atr_laguerre_indicator(sample_ohlcv_lowercase)
+        config = IndicatorConfig()
+        result = compute_indicator(config, sample_ohlcv_lowercase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_lowercase)
@@ -101,21 +107,22 @@ class TestATRLaguerreIndicator:
             def df(self):
                 return sample_ohlcv_titlecase
 
-        result = atr_laguerre_indicator(MockData())
+        config = IndicatorConfig()
+        result = compute_indicator(config, MockData())
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
 
     def test_custom_parameters(self, sample_ohlcv_titlecase):
         """Test with custom parameters."""
-        result = atr_laguerre_indicator(
-            sample_ohlcv_titlecase,
+        config = IndicatorConfig(
             atr_period=20,
             smoothing_period=7,
             adaptive_offset=0.5,
             level_up=0.9,
             level_down=0.1,
         )
+        result = compute_indicator(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -125,9 +132,10 @@ class TestATRLaguerreIndicator:
     def test_missing_columns_raises_clear_error(self):
         """Test that missing columns raise ValueError with clear message."""
         df = pd.DataFrame({"Open": [100], "High": [101]})
+        config = IndicatorConfig()
 
         with pytest.raises(ValueError) as exc_info:
-            atr_laguerre_indicator(df)
+            compute_indicator(config, df)
 
         error_msg = str(exc_info.value)
         assert "missing required columns" in error_msg.lower()
@@ -137,8 +145,10 @@ class TestATRLaguerreIndicator:
 
     def test_invalid_data_type_raises_clear_error(self):
         """Test that invalid data type raises TypeError with clear message."""
+        config = IndicatorConfig()
+
         with pytest.raises(TypeError) as exc_info:
-            atr_laguerre_indicator([1, 2, 3])
+            compute_indicator(config, [1, 2, 3])
 
         error_msg = str(exc_info.value)
         assert "must be" in error_msg.lower()
@@ -146,16 +156,18 @@ class TestATRLaguerreIndicator:
 
     def test_output_length_matches_input(self, sample_ohlcv_titlecase):
         """SLO: Output length matches input length 100%."""
+        config = IndicatorConfig()
         # Test with different lengths within available data
         max_len = len(sample_ohlcv_titlecase)
         for n in [50, 75, max_len]:
             df = sample_ohlcv_titlecase.iloc[:n]
-            result = atr_laguerre_indicator(df)
+            result = compute_indicator(config, df)
             assert len(result) == n, f"Length mismatch for n={n}"
 
     def test_output_range_guarantee(self, sample_ohlcv_titlecase):
         """SLO: Output value range [0.0, 1.0]: 100%."""
-        result = atr_laguerre_indicator(sample_ohlcv_titlecase)
+        config = IndicatorConfig()
+        result = compute_indicator(config, sample_ohlcv_titlecase)
 
         # Check every value is in valid range
         assert np.all(result >= 0.0), f"Values below 0.0: {result[result < 0.0]}"
@@ -169,14 +181,13 @@ class TestATRLaguerreIndicator:
             assert first_valid_idx < 50, "Too many NaN values in warmup"
 
 
-class TestATRLaguerreFeatures:
-    """Test atr_laguerre_features function."""
+class TestComputeFeature:
+    """Test compute_feature function with Pydantic API."""
 
     def test_extract_rsi_feature(self, sample_ohlcv_titlecase):
         """Test extracting RSI feature."""
-        result = atr_laguerre_features(
-            sample_ohlcv_titlecase, feature_name="rsi"
-        )
+        config = FeatureConfig(feature_name="rsi")
+        result = compute_feature(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -185,9 +196,8 @@ class TestATRLaguerreFeatures:
 
     def test_extract_regime_feature(self, sample_ohlcv_titlecase):
         """Test extracting regime feature."""
-        result = atr_laguerre_features(
-            sample_ohlcv_titlecase, feature_name="regime"
-        )
+        config = FeatureConfig(feature_name="regime")
+        result = compute_feature(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -197,9 +207,8 @@ class TestATRLaguerreFeatures:
 
     def test_extract_volatility_feature(self, sample_ohlcv_titlecase):
         """Test extracting volatility feature."""
-        result = atr_laguerre_features(
-            sample_ohlcv_titlecase, feature_name="rsi_volatility_20"
-        )
+        config = FeatureConfig(feature_name="rsi_volatility_20")
+        result = compute_feature(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -208,9 +217,8 @@ class TestATRLaguerreFeatures:
 
     def test_extract_boolean_feature(self, sample_ohlcv_titlecase):
         """Test extracting boolean feature."""
-        result = atr_laguerre_features(
-            sample_ohlcv_titlecase, feature_name="regime_bearish"
-        )
+        config = FeatureConfig(feature_name="regime_bearish")
+        result = compute_feature(config, sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == len(sample_ohlcv_titlecase)
@@ -222,16 +230,22 @@ class TestATRLaguerreFeatures:
         self, sample_ohlcv_titlecase
     ):
         """Test that invalid feature name raises ValueError with available features."""
-        with pytest.raises(ValueError) as exc_info:
-            atr_laguerre_features(
-                sample_ohlcv_titlecase, feature_name="invalid_feature"
-            )
+        config = FeatureConfig(feature_name="rsi")  # Valid config first
+        # Now create invalid config - but Pydantic will catch this at creation
+        # So we need to test the runtime error from compute_feature
 
-        error_msg = str(exc_info.value)
-        assert "not found" in error_msg.lower()
-        assert "available" in error_msg.lower()
-        # Should list some features
-        assert "rsi" in error_msg.lower()
+        # For this test, we'll pass a valid config but the error happens in compute_feature
+        # when checking if feature exists in the dataframe
+        # Actually, FeatureConfig uses Literal type, so invalid feature_name will
+        # be caught by Pydantic validation at config creation time
+
+        # Let's test that compute_feature raises error for valid but non-existent feature
+        # Actually, the Literal type prevents invalid feature names at config level
+        # This test now validates Pydantic's constraint enforcement
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            FeatureConfig(feature_name="invalid_feature")  # type: ignore
 
     def test_all_31_features_accessible(self, sample_ohlcv_titlecase):
         """Test that all expected features are accessible."""
@@ -251,19 +265,18 @@ class TestATRLaguerreFeatures:
         ]
 
         for feature in expected_features:
-            result = atr_laguerre_features(
-                sample_ohlcv_titlecase, feature_name=feature
-            )
+            config = FeatureConfig(feature_name=feature)  # type: ignore
+            result = compute_feature(config, sample_ohlcv_titlecase)
             assert isinstance(result, np.ndarray)
             assert len(result) == len(sample_ohlcv_titlecase)
 
 
 class TestMakeIndicator:
-    """Test make_atr_laguerre_indicator factory."""
+    """Test make_indicator factory with Pydantic validation."""
 
     def test_factory_returns_callable(self):
         """Test that factory returns callable function."""
-        indicator = make_atr_laguerre_indicator(atr_period=20)
+        indicator = make_indicator(atr_period=20)
 
         assert callable(indicator)
         assert hasattr(indicator, "__name__")
@@ -271,9 +284,7 @@ class TestMakeIndicator:
 
     def test_factory_function_works(self, sample_ohlcv_titlecase):
         """Test that created function works correctly."""
-        indicator = make_atr_laguerre_indicator(
-            atr_period=15, smoothing_period=4
-        )
+        indicator = make_indicator(atr_period=15, smoothing_period=4)
         result = indicator(sample_ohlcv_titlecase)
 
         assert isinstance(result, np.ndarray)
@@ -283,23 +294,33 @@ class TestMakeIndicator:
 
     def test_factory_name_includes_parameters(self):
         """Test that factory sets function name with parameters."""
-        indicator = make_atr_laguerre_indicator(
-            atr_period=25, smoothing_period=8
-        )
+        indicator = make_indicator(atr_period=25, smoothing_period=8)
 
         assert "25" in indicator.__name__
         assert "8" in indicator.__name__
 
     def test_multiple_indicators_independent(self, sample_ohlcv_titlecase):
         """Test that multiple indicators are independent."""
-        fast = make_atr_laguerre_indicator(atr_period=10)
-        slow = make_atr_laguerre_indicator(atr_period=20)
+        fast = make_indicator(atr_period=10)
+        slow = make_indicator(atr_period=20)
 
         fast_result = fast(sample_ohlcv_titlecase)
         slow_result = slow(sample_ohlcv_titlecase)
 
         # Results should differ (different parameters)
         assert not np.allclose(fast_result, slow_result)
+
+    def test_factory_validates_parameters(self):
+        """Test that factory validates parameters via Pydantic."""
+        from pydantic import ValidationError
+
+        # Invalid atr_period (too high)
+        with pytest.raises(ValidationError):
+            make_indicator(atr_period=50)
+
+        # Invalid smoothing_period (too low)
+        with pytest.raises(ValidationError):
+            make_indicator(smoothing_period=2)
 
 
 class TestNonAnticipative:
@@ -312,12 +333,13 @@ class TestNonAnticipative:
         Verify that computing on first N rows produces identical results
         to computing on full dataset and taking first N values.
         """
-        full_result = atr_laguerre_indicator(sample_ohlcv_titlecase)
+        config = IndicatorConfig()
+        full_result = compute_indicator(config, sample_ohlcv_titlecase)
 
         # Test at multiple points
         for n in [50, 75, 90]:
             partial_df = sample_ohlcv_titlecase.iloc[:n]
-            partial_result = atr_laguerre_indicator(partial_df)
+            partial_result = compute_indicator(config, partial_df)
 
             # First N values should be identical (non-anticipative)
             np.testing.assert_allclose(
@@ -330,15 +352,12 @@ class TestNonAnticipative:
 
     def test_non_anticipative_with_features(self, sample_ohlcv_titlecase):
         """Test non-anticipative property for features."""
-        full_result = atr_laguerre_features(
-            sample_ohlcv_titlecase, feature_name="regime"
-        )
+        config = FeatureConfig(feature_name="regime")
+        full_result = compute_feature(config, sample_ohlcv_titlecase)
 
         for n in [50, 75]:
             partial_df = sample_ohlcv_titlecase.iloc[:n]
-            partial_result = atr_laguerre_features(
-                partial_df, feature_name="regime"
-            )
+            partial_result = compute_feature(config, partial_df)
 
             np.testing.assert_allclose(
                 partial_result,
@@ -354,12 +373,14 @@ class TestColumnMapping:
     def test_titlecase_to_lowercase_mapping(self, sample_ohlcv_titlecase):
         """SLO: Column mapping bidirectional accuracy 100% (Title → lower)."""
         # Should work with Title case
-        result = atr_laguerre_indicator(sample_ohlcv_titlecase)
+        config = IndicatorConfig()
+        result = compute_indicator(config, sample_ohlcv_titlecase)
         assert isinstance(result, np.ndarray)
 
     def test_lowercase_columns_work(self, sample_ohlcv_lowercase):
         """Test that lowercase columns also work (already in internal format)."""
-        result = atr_laguerre_indicator(sample_ohlcv_lowercase)
+        config = IndicatorConfig()
+        result = compute_indicator(config, sample_ohlcv_lowercase)
         assert isinstance(result, np.ndarray)
 
     def test_mixed_case_columns_rejected(self):
@@ -373,9 +394,10 @@ class TestColumnMapping:
                 "Volume": [1000],
             }
         )
+        config = IndicatorConfig()
 
         with pytest.raises(ValueError) as exc_info:
-            atr_laguerre_indicator(df)
+            compute_indicator(config, df)
 
         error_msg = str(exc_info.value)
         assert "missing required columns" in error_msg.lower()
@@ -388,7 +410,8 @@ class TestEdgeCases:
         """Test with minimum data rows (warmup period)."""
         # Should work with at least 50 rows (enough for warmup)
         df = sample_ohlcv_titlecase.iloc[:50]
-        result = atr_laguerre_indicator(df)
+        config = IndicatorConfig()
+        result = compute_indicator(config, df)
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 50
@@ -398,10 +421,11 @@ class TestEdgeCases:
         df = pd.DataFrame(
             {"Open": [], "High": [], "Low": [], "Close": [], "Volume": []}
         )
+        config = IndicatorConfig()
 
         # Empty DataFrame will propagate error from core computation
         with pytest.raises(Exception):  # Could be ValueError or IndexError
-            atr_laguerre_indicator(df)
+            compute_indicator(config, df)
 
     def test_single_row_raises_error(self):
         """Test that single row raises appropriate error."""
@@ -414,10 +438,11 @@ class TestEdgeCases:
                 "Volume": [1000],
             }
         )
+        config = IndicatorConfig()
 
         # Single row insufficient for computation
         with pytest.raises(Exception):
-            atr_laguerre_indicator(df)
+            compute_indicator(config, df)
 
 
 class TestBacktestingIntegration:
@@ -435,8 +460,9 @@ class TestBacktestingIntegration:
                 return func(*args, **kwargs)
 
             def init(self):
-                # This is how it would be used in real Strategy
-                self.rsi = self.I(atr_laguerre_indicator, self.data)
+                # This is how it would be used in real Strategy with v2.0.0 API
+                config = IndicatorConfig()
+                self.rsi = self.I(compute_indicator, config, self.data)
                 return self.rsi
 
         class MockData:
@@ -454,12 +480,8 @@ class TestBacktestingIntegration:
         self, sample_ohlcv_titlecase
     ):
         """Test factory pattern for multiple indicators."""
-        fast_indicator = make_atr_laguerre_indicator(
-            atr_period=10, smoothing_period=3
-        )
-        slow_indicator = make_atr_laguerre_indicator(
-            atr_period=20, smoothing_period=7
-        )
+        fast_indicator = make_indicator(atr_period=10, smoothing_period=3)
+        slow_indicator = make_indicator(atr_period=20, smoothing_period=7)
 
         fast_result = fast_indicator(sample_ohlcv_titlecase)
         slow_result = slow_indicator(sample_ohlcv_titlecase)
