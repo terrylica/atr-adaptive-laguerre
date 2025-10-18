@@ -44,8 +44,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Eon-Labs/atr-adaptive-laguerre"
-Documentation = "https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/main/docs/README.md"
+Repository = "https://github.com/terrylica/atr-adaptive-laguerre"
+Documentation = "https://github.com/terrylica/atr-adaptive-laguerre/blob/main/docs/README.md"
 
 [tool.hatchling.build.targets.wheel]
 packages = ["src/atr_adaptive_laguerre"]

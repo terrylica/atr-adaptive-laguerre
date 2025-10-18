@@ -135,9 +135,9 @@ print(f"Features: {feature.n_features}")  # 133 (85 by default)
 
 ## Documentation
 
-- [API Reference](https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/main/docs/API_REFERENCE.md) - Complete API documentation
-- [Examples](https://github.com/Eon-Labs/atr-adaptive-laguerre/tree/main/examples) - Runnable usage examples
-- [Changelog](https://github.com/Eon-Labs/atr-adaptive-laguerre/blob/main/CHANGELOG.md) - Release notes and version history
+- [API Reference](https://github.com/terrylica/atr-adaptive-laguerre/blob/main/docs/API_REFERENCE.md) - Complete API documentation
+- [Examples](https://github.com/terrylica/atr-adaptive-laguerre/tree/main/examples) - Runnable usage examples
+- [Changelog](https://github.com/terrylica/atr-adaptive-laguerre/blob/main/CHANGELOG.md) - Release notes and version history
 
 ## License
 

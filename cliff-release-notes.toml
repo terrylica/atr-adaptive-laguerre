@@ -16,7 +16,7 @@ body = """
 
 {% endfor %}
 ---
-**Full Changelog**: https://github.com/Eon-Labs/rangebar/compare/{{ previous.version }}...{{ version }}
+**Full Changelog**: https://github.com/terrylica/atr-adaptive-laguerre/compare/{{ previous.version }}...{{ version }}
 """
 footer = ""
 trim = true
