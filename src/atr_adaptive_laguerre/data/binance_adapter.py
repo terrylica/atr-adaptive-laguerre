@@ -48,7 +48,7 @@ class BinanceAdapter:
             ValueError: If cache_dir is not a directory
         """
         if cache_dir is None:
-            self.cache_dir = Path(user_cache_dir("atr-adaptive-laguerre", "eonlabs"))
+            self.cache_dir = Path(user_cache_dir("atr-adaptive-laguerre", "terrylica"))
         else:
             self.cache_dir = Path(cache_dir)
 

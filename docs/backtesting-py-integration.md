@@ -361,5 +361,5 @@ Available features (31): ['abs_dist_overbought', 'abs_dist_oversold', ...]
 ## References
 
 - backtesting.py documentation: https://kernc.github.io/backtesting.py/
-- Package repository: https://github.com/terryli710/atr-adaptive-laguerre
+- Package repository: https://github.com/terrylica/atr-adaptive-laguerre
 - API specifications: `/docs/backtesting-py-integration-plan.md`
