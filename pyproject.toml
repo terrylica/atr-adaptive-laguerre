@@ -8,7 +8,7 @@ version = "2.0.1"
 description = "ATR-adaptive Laguerre RSI for non-anticipative feature engineering in seq-2-seq forecasting"
 readme = "docs/README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license-expression = "MIT"
 authors = [{name = "Eon Labs Ltd."}]
 keywords = ["trading", "features", "seq2seq", "volatility", "rsi", "laguerre", "atr"]
 classifiers = [
@@ -51,14 +51,7 @@ Documentation = "https://github.com/terrylica/atr-adaptive-laguerre/blob/main/do
 packages = ["src/atr_adaptive_laguerre"]
 
 [tool.hatchling.build.targets.sdist]
-include = [
-  "/src",
-  "/tests",
-  "/pyproject.toml",
-  "/README.md",
-  "/LICENSE",
-]
-exclude = []
+exclude = ["/LICENSE"]
 
 [tool.ruff]
 line-length = 100
