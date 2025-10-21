@@ -4,7 +4,7 @@ ATR-Adaptive Laguerre RSI Feature Engineering Library.
 Non-anticipative volatility-adaptive momentum indicator for seq-2-seq forecasting.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.0.3"
 
 # Core components
 from atr_adaptive_laguerre.core import (  # noqa: F401
@@ -15,8 +15,11 @@ from atr_adaptive_laguerre.core import (  # noqa: F401
     calculate_gamma,
 )
 
-# Data adapters
-from atr_adaptive_laguerre.data import BinanceAdapter  # noqa: F401
+# Data adapters (optional, requires [data] extras)
+try:
+    from atr_adaptive_laguerre.data import BinanceAdapter  # noqa: F401
+except ImportError:
+    BinanceAdapter = None  # noqa: F841
 
 # Feature constructors
 from atr_adaptive_laguerre.features import (  # noqa: F401
@@ -50,31 +53,35 @@ from atr_adaptive_laguerre.backtesting_models import (  # noqa: F401
 # collision with features.FeatureConfig. Import explicitly if needed:
 # from atr_adaptive_laguerre.backtesting_models import FeatureConfig
 
-__all__ = [
-    # Core
-    "ATRState",
-    "LaguerreFilterState",
-    "TrueRangeState",
-    "calculate_adaptive_coefficient",
-    "calculate_gamma",
-    # Data
-    "BinanceAdapter",
-    # Features
-    "ATRAdaptiveLaguerreRSI",
-    "ATRAdaptiveLaguerreRSIConfig",
-    "BaseFeature",
-    "FeatureConfig",
-    "FeatureExpander",
-    "MultiIntervalProcessor",
-    "CrossIntervalFeatures",
-    # Validation
-    "validate_non_anticipative",
-    "calculate_information_coefficient",
-    "validate_information_coefficient",
-    "validate_ood_robustness",
-    # backtesting.py adapter (v2.0.0 Pydantic API)
-    "IndicatorConfig",
-    "compute_indicator",
-    "compute_feature",
-    "make_indicator",
-]
+__all__ = (
+    [
+        # Core
+        "ATRState",
+        "LaguerreFilterState",
+        "TrueRangeState",
+        "calculate_adaptive_coefficient",
+        "calculate_gamma",
+    ]
+    # Data (optional, requires [data] extras)
+    + (["BinanceAdapter"] if BinanceAdapter is not None else [])
+    + [
+        # Features
+        "ATRAdaptiveLaguerreRSI",
+        "ATRAdaptiveLaguerreRSIConfig",
+        "BaseFeature",
+        "FeatureConfig",
+        "FeatureExpander",
+        "MultiIntervalProcessor",
+        "CrossIntervalFeatures",
+        # Validation
+        "validate_non_anticipative",
+        "calculate_information_coefficient",
+        "validate_information_coefficient",
+        "validate_ood_robustness",
+        # backtesting.py adapter (v2.0.0 Pydantic API)
+        "IndicatorConfig",
+        "compute_indicator",
+        "compute_feature",
+        "make_indicator",
+    ]
+)

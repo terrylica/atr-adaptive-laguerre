@@ -26,7 +26,11 @@ This library implements the ATR-Adaptive Laguerre RSI indicator, designed for ro
 ### PyPI (Public)
 
 ```bash
+# Core package (indicators, features, backtesting.py integration)
 uv add atr-adaptive-laguerre
+
+# With optional Binance data adapter (BinanceAdapter, Parquet caching)
+uv add "atr-adaptive-laguerre[data]"
 ```
 
 ### AWS CodeArtifact (EonLabs Private)
@@ -34,6 +38,16 @@ uv add atr-adaptive-laguerre
 The package is also available in the EonLabs CodeArtifact repository for internal use.
 
 For details on setting up CodeArtifact publishing and credentials, see [CodeArtifact Setup Guide](./CODEARTIFACT_SETUP.md).
+
+#### Install from CodeArtifact
+
+```bash
+# Configure CodeArtifact credentials (see CODEARTIFACT_SETUP.md)
+uv add atr-adaptive-laguerre --index-url <codeartifact-url>
+
+# With optional data adapter
+uv add "atr-adaptive-laguerre[data]" --index-url <codeartifact-url>
+```
 
 ## Feature Modes: Choose Your Use Case
 
