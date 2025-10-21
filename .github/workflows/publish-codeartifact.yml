@@ -1,0 +1,65 @@
+name: Publish to AWS CodeArtifact
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-codeartifact:
+    name: Publish to AWS CodeArtifact
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: codeartifact
+      url: https://console.aws.amazon.com/codesigning/home
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Authenticate with CodeArtifact
+        run: |
+          aws codeartifact login --tool twine \
+            --repository ${{ secrets.CODEARTIFACT_REPOSITORY }} \
+            --domain ${{ secrets.CODEARTIFACT_DOMAIN }} \
+            --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Install twine
+        run: pip install --quiet twine
+
+      - name: Publish to CodeArtifact
+        run: twine upload --verbose --repository codeartifact dist/*

@@ -23,9 +23,17 @@ This library implements the ATR-Adaptive Laguerre RSI indicator, designed for ro
 
 ## Installation
 
+### PyPI (Public)
+
 ```bash
 uv add atr-adaptive-laguerre
 ```
+
+### AWS CodeArtifact (EonLabs Private)
+
+The package is also available in the EonLabs CodeArtifact repository for internal use.
+
+For details on setting up CodeArtifact publishing and credentials, see [CodeArtifact Setup Guide](./CODEARTIFACT_SETUP.md).
 
 ## Feature Modes: Choose Your Use Case
 
