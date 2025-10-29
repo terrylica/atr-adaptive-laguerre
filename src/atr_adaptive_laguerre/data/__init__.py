@@ -7,6 +7,7 @@ except ImportError:
     BinanceAdapter = None  # noqa: F841
     _has_data_extras = False
 
+from atr_adaptive_laguerre.data.exness_adapter import ExnessPhase7Adapter
 from atr_adaptive_laguerre.data.schema import OHLCVBatch, OHLCVRecord
 
 __all__ = (
@@ -14,5 +15,6 @@ __all__ = (
     + [
         "OHLCVRecord",
         "OHLCVBatch",
+        "ExnessPhase7Adapter",
     ]
 )
