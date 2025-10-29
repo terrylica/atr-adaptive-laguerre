@@ -15,6 +15,9 @@ from atr_adaptive_laguerre.core import (  # noqa: F401
     calculate_gamma,
 )
 
+# Data adapters
+from atr_adaptive_laguerre.data import ExnessPhase7Adapter  # noqa: F401
+
 # Data adapters (optional, requires [data] extras)
 try:
     from atr_adaptive_laguerre.data import BinanceAdapter  # noqa: F401
@@ -61,6 +64,8 @@ __all__ = (
         "TrueRangeState",
         "calculate_adaptive_coefficient",
         "calculate_gamma",
+        # Data adapters
+        "ExnessPhase7Adapter",
     ]
     # Data (optional, requires [data] extras)
     + (["BinanceAdapter"] if BinanceAdapter is not None else [])

@@ -84,3 +84,8 @@ max_examples = 100
 deadline = 10000
 derandomize = false
 verbosity = "normal"
+
+[dependency-groups]
+dev = [
+    "exness-data-preprocess>=0.7.2",
+]
