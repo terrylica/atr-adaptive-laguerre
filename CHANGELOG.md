@@ -5,6 +5,56 @@ All notable changes to RangeBar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-10-29
+
+### ✨ Features
+
+- **Add 3 session features from exness-data-preprocess Phase7 schema (85 → 88 features)**
+  - Implement `ExnessPhase7Adapter` for extracting time-based session features
+  - Add 3 global session features: `is_nyse_session`, `is_lse_session`, `is_xtks_session`
+  - Result: 85 RSI features + 3 session features = **88 total features** (+3.5%)
+  - Session features capture liquidity/volatility regimes by time of day
+  - Orthogonality validated: max |ρ| < 0.07 with existing RSI features
+  - Non-anticipative: determined by current bar timestamp only
+  - Zero computation overhead: pre-computed in Phase7 schema
+  - Works for both forex and cryptocurrency markets (60-70% of BTC/ETH volume during NYSE hours)
+
+### 📚 Documentation
+
+- Add comprehensive integration guide: `docs/EXNESS_INTEGRATION.md`
+  - Complete API reference with examples
+  - Crypto-specific guidance explaining session feature relevance for 24/7 markets
+  - Validation framework integration examples
+  - Troubleshooting and performance characteristics
+
+### 🧪 Testing
+
+- Add comprehensive test suite: `tests/test_exness_adapter.py` (17 tests, 98% coverage)
+  - Schema validation tests
+  - Binary value enforcement tests
+  - RSI + session integration tests
+  - Orthogonality validation
+  - Non-anticipative property verification
+  - End-to-end integration tests
+- Add validation script: `tests/validate_session_features.py`
+  - Real data validation with exness Phase7 OHLC
+  - Information Coefficient (IC) calculation
+  - Session coverage statistics
+
+### 🔧 Build
+
+- Add `exness-data-preprocess>=0.7.2` as dev dependency
+  - Required for Phase7 feature validation
+  - Enables testing with real market data
+
+### 📦 Package Exports
+
+- Export `ExnessPhase7Adapter` in top-level `__init__.py`
+  - Available as: `from atr_adaptive_laguerre import ExnessPhase7Adapter`
+
+---
+
+## Previous Releases
 
 ### ⚠️ Breaking Changes
 

@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository.
 
 | Item | Value |
 |------|-------|
-| **Version** | 2.0.3 |
+| **Version** | 2.1.0 |
 | **License** | MIT |
 | **Python** | 3.10+ (managed with `uv`) |
 | **Status** | Production-ready |
