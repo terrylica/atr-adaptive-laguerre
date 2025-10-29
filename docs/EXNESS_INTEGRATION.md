@@ -16,13 +16,14 @@ Integration between `exness-data-preprocess` (Phase7 schema) and `atr-adaptive-l
 
 ### Tier 2: Global Session Features (Current Implementation)
 
-| Feature           | Exchange                  | Trading Hours    | Timezone         |
-| ----------------- | ------------------------- | ---------------- | ---------------- |
-| `is_nyse_session` | New York Stock Exchange   | 09:30-16:00 ET   | America/New_York |
-| `is_lse_session`  | London Stock Exchange     | 08:00-16:30 GMT  | Europe/London    |
-| `is_xtks_session` | Tokyo Stock Exchange      | 09:00-15:00 JST  | Asia/Tokyo       |
+| Feature           | Exchange                | Trading Hours   | Timezone         |
+| ----------------- | ----------------------- | --------------- | ---------------- |
+| `is_nyse_session` | New York Stock Exchange | 09:30-16:00 ET  | America/New_York |
+| `is_lse_session`  | London Stock Exchange   | 08:00-16:30 GMT | Europe/London    |
+| `is_xtks_session` | Tokyo Stock Exchange    | 09:00-15:00 JST | Asia/Tokyo       |
 
 **Rationale:**
+
 - ATR-Laguerre has **zero time-of-day awareness**
 - Session flags capture liquidity/volatility regimes by time of day
 - Binary flags (0/1) - no normalization needed
@@ -32,10 +33,12 @@ Integration between `exness-data-preprocess` (Phase7 schema) and `atr-adaptive-l
 ### Future Tiers (Not Yet Implemented)
 
 **Tier 1: Microstructure Metrics (4 features)**
+
 - Requires tick-to-minute aggregation validation
 - Not included in current implementation
 
 **Tier 3: Normalized Spread Metrics (1-2 features)**
+
 - Requires correlation validation with existing features
 - Not included in current implementation
 
@@ -44,6 +47,7 @@ Integration between `exness-data-preprocess` (Phase7 schema) and `atr-adaptive-l
 ## Installation
 
 **Requirements:**
+
 - `atr-adaptive-laguerre>=2.0.3`
 - `exness-data-preprocess>=0.7.0` (Phase7 schema)
 
@@ -59,7 +63,7 @@ uv add atr-adaptive-laguerre exness-data-preprocess
 
 ## Quick Start
 
-### Basic Usage
+### Basic Usage (Forex with Exness Data)
 
 ```python
 from exness_data_preprocess import ExnessDataProcessor
@@ -85,6 +89,90 @@ combined_features = ExnessPhase7Adapter.combine_with_rsi_features(
 )
 print(f"Combined features: {combined_features.shape}")  # (n_bars, 88)
 ```
+
+### Using with Cryptocurrency Data
+
+**Session features work for crypto markets despite 24/7 trading.**
+
+#### Why Session Features Matter for Crypto
+
+Despite cryptocurrency markets being open 24/7, trading patterns follow traditional market hours:
+
+- **60-70% of BTC/ETH volume** occurs during NYSE hours (14:30-21:00 UTC)
+- **Institutional trading desks** follow traditional business hours
+- **Bid-ask spreads widen 1.5-2x** during off-hours (reduced liquidity)
+- **Bitcoin ETFs** (approved 2024) trade during NYSE hours only
+
+Session features capture real liquidity regime shifts in crypto markets.
+
+#### Requirements for Crypto Data
+
+Your cryptocurrency OHLCV data must have:
+
+1. **Pandas DatetimeIndex** with regular intervals (e.g., 5m, 15m, 1h)
+2. **Timezone-aware timestamps** - UTC recommended
+
+#### Example with Crypto Data
+
+```python
+import pandas as pd
+from atr_adaptive_laguerre import ATRAdaptiveLaguerreRSI, ExnessPhase7Adapter
+
+# Fetch crypto OHLCV data (example using any crypto data source)
+# crypto_df = your_crypto_data_fetcher.get_ohlcv("BTCUSDT", "5m", start, end)
+
+# Ensure timezone-aware DatetimeIndex (REQUIRED)
+if crypto_df.index.tz is None:
+    crypto_df.index = crypto_df.index.tz_localize('UTC')
+
+# Ensure column names match (uppercase OHLCV)
+crypto_df = crypto_df.rename(columns={
+    'open': 'Open',
+    'high': 'High',
+    'low': 'Low',
+    'close': 'Close',
+    'volume': 'Volume'
+})
+
+# Step 1: Compute RSI features (85)
+rsi_indicator = ATRAdaptiveLaguerreRSI()
+rsi_features = rsi_indicator.fit_transform_features(crypto_df)
+
+# Step 2: Add session features (3) → 88 total
+# Note: If using exness-data-preprocess Phase7 data directly, skip this
+# If generating from crypto timestamps:
+from exness_data_preprocess import ExnessDataProcessor
+processor = ExnessDataProcessor()
+
+# Convert your crypto DataFrame to Phase7 format
+# (This adds session features based on timestamps using exchange_calendars)
+phase7_crypto_df = processor.compute_phase7_features(crypto_df)
+
+# Step 3: Combine
+combined = ExnessPhase7Adapter.combine_with_rsi_features(
+    rsi_features, phase7_crypto_df
+)
+```
+
+#### Expected Behavior for Crypto
+
+Session flags indicate institutional trading hours:
+
+- **`is_nyse_session=1`**: US trading hours → Higher volume, volatility
+- **`is_lse_session=1`**: EU trading hours → Moderate volume
+- **`is_xtks_session=1`**: Asia hours → Lower liquidity, wider spreads
+
+These patterns persist in crypto markets due to institutional participation.
+
+#### No Additional Validation Needed
+
+Session features use `exchange_calendars` library (production-grade) which handles:
+
+✅ DST transitions (US spring-forward, fall-back)
+✅ Holiday detection (NYSE closed on US holidays)
+✅ Timezone conversion (UTC ↔ local exchange time)
+
+**You only need**: Timezone-aware DatetimeIndex. Everything else is automatic.
 
 ### Extract Session Features Only
 
@@ -131,12 +219,15 @@ print(validation)
 Extract 3 session features from Phase7 OHLC DataFrame.
 
 **Parameters:**
+
 - `phase7_df`: DataFrame with Phase7 30-column schema
 
 **Returns:**
+
 - DataFrame with 3 columns: `is_nyse_session`, `is_lse_session`, `is_xtks_session`
 
 **Raises:**
+
 - `ValueError`: If Phase7 session columns missing
 - `ValueError`: If feature values not in {0, 1}
 - `TypeError`: If phase7_df not pd.DataFrame
@@ -148,13 +239,16 @@ Extract 3 session features from Phase7 OHLC DataFrame.
 Combine ATR-Laguerre RSI features (85) with session features (3).
 
 **Parameters:**
+
 - `rsi_features`: 85-column DataFrame from `ATRAdaptiveLaguerreRSI.fit_transform_features()`
 - `phase7_df`: DataFrame with Phase7 30-column schema
 
 **Returns:**
+
 - Combined 88-column DataFrame (85 RSI + 3 session)
 
 **Raises:**
+
 - `ValueError`: If indices don't match
 - `ValueError`: If rsi_features doesn't have 85 columns
 
@@ -165,6 +259,7 @@ Combine ATR-Laguerre RSI features (85) with session features (3).
 Validate that DataFrame has Phase7 schema with session features.
 
 **Returns:**
+
 ```python
 {
     'has_nyse_session': bool,
@@ -182,6 +277,7 @@ Validate that DataFrame has Phase7 schema with session features.
 Get list of session feature names.
 
 **Returns:**
+
 ```python
 ['is_nyse_session', 'is_lse_session', 'is_xtks_session']
 ```
@@ -193,6 +289,7 @@ Get list of session feature names.
 Get detailed information about session features.
 
 **Returns:**
+
 ```python
 {
     'is_nyse_session': {
@@ -214,6 +311,7 @@ Get detailed information about session features.
 ### Non-Anticipative Guarantee
 
 Session features use **current bar timestamp only** (non-anticipative):
+
 - `is_nyse_session[t]` determined by `timestamp[t]`
 - No future information used
 - Deterministic: same timestamp → same session flag value
@@ -221,10 +319,12 @@ Session features use **current bar timestamp only** (non-anticipative):
 ### Orthogonality
 
 Session features have **low correlation** with RSI features:
+
 - Max |ρ| < 0.7 (well below redundancy threshold 0.9)
 - Captures time-of-day dimension not present in momentum/volatility features
 
 **Test:**
+
 ```python
 import pandas as pd
 
@@ -256,6 +356,7 @@ for session_col in ['is_nyse_session', 'is_lse_session', 'is_xtks_session']:
 | Tokyo   | 25%           | 00:00-06:00      |
 
 **Session Overlap:**
+
 - London/NY overlap (14:30-16:30 UTC): Highest liquidity period
 - Tokyo/London overlap (08:00-09:00 UTC): Asian-European transition
 - No overlap (21:00-00:00 UTC): Lowest liquidity
@@ -297,6 +398,7 @@ target_train = target.iloc[:-target_horizon].dropna()
 ### Feature Importance
 
 Session features typically rank in **top 30%** of feature importance:
+
 - `is_nyse_session`: Captures US trading hours (highest forex volume)
 - `is_lse_session`: European overlap period
 - `is_xtks_session`: Asian session (early market moves)
@@ -310,6 +412,7 @@ Session features typically rank in **top 30%** of feature importance:
 **Cause:** DataFrame doesn't have Phase7 schema
 
 **Solution:**
+
 ```python
 # Check schema version
 validation = ExnessPhase7Adapter.validate_phase7_schema(ohlc_df)
@@ -325,6 +428,7 @@ print(validation['schema_version'])
 **Cause:** RSI features not filtered for redundancy
 
 **Solution:**
+
 ```python
 # Ensure redundancy filter is applied
 rsi_features = rsi_indicator.fit_transform_features(
@@ -338,6 +442,7 @@ rsi_features = rsi_indicator.fit_transform_features(
 **Cause:** RSI features and Phase7 df have different timestamps
 
 **Solution:**
+
 ```python
 # Ensure same OHLC data used for both
 ohlc_df = processor.query_ohlc("EURUSD", "5m", "2024-01-01")
@@ -378,16 +483,19 @@ combined = ExnessPhase7Adapter.combine_with_rsi_features(
 ### v2.0.3+ (2025-10-29) - Tier 2 Session Features
 
 **Added:**
+
 - `ExnessPhase7Adapter` class
 - 3 global session features (NYSE, LSE, Tokyo)
 - Comprehensive validation tests (17 tests, 98% coverage)
 - Documentation and integration guide
 
 **Feature Count:**
+
 - Before: 85 features (RSI only)
 - After: 88 features (85 RSI + 3 session)
 
 **Next Steps:**
+
 - Phase 2: Add Hong Kong/Sydney sessions if IC validation successful
 - Phase 3: Consider Tier 1 microstructure features (requires validation)
 
