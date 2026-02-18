@@ -17,13 +17,7 @@ plugins:
         - { type: "revert", release: "patch" }
   - "@semantic-release/release-notes-generator"
   - - "@semantic-release/exec"
-    - prepareCmd: |
-        /usr/bin/env bash -c '
-          VERSION="${nextRelease.version}"
-          # Update pyproject.toml version
-          sed -i "" "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
-          echo "✓ pyproject.toml → v${VERSION}"
-        '
+    - prepareCmd: "sed -i '' 's/^version = \".*\"/version = \"${nextRelease.version}\"/' pyproject.toml && echo '✓ pyproject.toml → v${nextRelease.version}'"
   - "@semantic-release/changelog"
   - - "@semantic-release/git"
     - assets:
@@ -31,5 +25,5 @@ plugins:
         - CHANGELOG.md
       message: "chore(release): ${nextRelease.version} [skip ci]\n\nSRED-Type: support-work\nSRED-Claim: ATR-ADAPTIVE-LAGUERRE"
   - - "@semantic-release/exec"
-    - successCmd: "/usr/bin/env bash -c 'git push --follow-tags origin main && echo ✓ Pushed to origin'"
+    - successCmd: "git push --follow-tags origin main && echo '✓ Pushed to origin'"
   - "@semantic-release/github"
