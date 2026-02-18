@@ -369,8 +369,8 @@ class TestRedundancyFilterIntegration:
         indicator_no_filter = ATRAdaptiveLaguerreRSI(config_no_filter)
         indicator_with_filter = ATRAdaptiveLaguerreRSI(config_with_filter)
 
-        assert indicator_no_filter.n_features == 33
-        assert indicator_with_filter.n_features == 33
+        assert indicator_no_filter.n_features == 31
+        assert indicator_with_filter.n_features == 31
 
     def test_filtered_features_deterministic(
         self, sample_ohlcv: pd.DataFrame
