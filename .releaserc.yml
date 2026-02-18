@@ -24,6 +24,4 @@ plugins:
         - pyproject.toml
         - CHANGELOG.md
       message: "chore(release): ${nextRelease.version} [skip ci]\n\nSRED-Type: support-work\nSRED-Claim: ATR-ADAPTIVE-LAGUERRE"
-  - - "@semantic-release/exec"
-    - successCmd: "git push --follow-tags origin main && echo '✓ Pushed to origin'"
   - "@semantic-release/github"

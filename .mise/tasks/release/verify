@@ -42,8 +42,8 @@ fi
 
 # Check 4: Local build artifacts
 echo "→ Checking build artifacts..."
-WHEEL_COUNT=$(ls dist/*"$VERSION"*.whl 2>/dev/null | wc -l | tr -d ' ')
-SDIST_COUNT=$(ls dist/*"$VERSION"*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
+WHEEL_COUNT=$(find dist -name "*${VERSION}*.whl" 2>/dev/null | wc -l | tr -d ' ')
+SDIST_COUNT=$(find dist -name "*${VERSION}*.tar.gz" 2>/dev/null | wc -l | tr -d ' ')
 echo "  ✓ Wheels: $WHEEL_COUNT, Sdists: $SDIST_COUNT"
 
 echo ""
