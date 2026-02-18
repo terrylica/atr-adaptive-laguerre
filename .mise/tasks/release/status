@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#MISE description="Display current release state: version, latest tag, unreleased commits, working directory, and auth. Read-only, no side effects."
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════"
+echo "  Release Status"
+echo "═══════════════════════════════════════════════════════════"
+
+# Current version from pyproject.toml
+CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+echo "Current version: v$CURRENT"
+
+# Latest tag
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+echo "Latest git tag:  $LATEST_TAG"
+
+# Commits since tag
+if [[ "$LATEST_TAG" != "none" ]]; then
+    COMMITS=$(git rev-list "$LATEST_TAG"..HEAD --count)
+    echo "Commits since:   $COMMITS"
+fi
+
+# Working directory status
+if [[ -z "$(git status --porcelain)" ]]; then
+    echo "Working dir:     ✓ clean"
+else
+    echo "Working dir:     ✗ dirty"
+    git status --short | head -5
+fi
+
+# GitHub auth (token check - no API calls)
+if [[ -n "${GH_TOKEN:-}" ]]; then
+    echo "GitHub token:    ✓ present (${#GH_TOKEN} chars)"
+else
+    echo "GitHub token:    ✗ not set (run: eval \"\$(mise env)\")"
+fi
+
+# PyPI status
+echo ""
+echo "Publishing channels:"
+echo "  PyPI:        https://pypi.org/project/atr-adaptive-laguerre/"
+echo "  CodeArtifact: eonlabs/el-prediction-pipeline"
+echo "  Trigger:     git push tag v$CURRENT → GitHub Actions"
+echo ""

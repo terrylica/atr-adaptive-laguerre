@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#MISE description="Phase 1 of 4: Validate all release prerequisites. Checks: clean working directory, GH_TOKEN presence and format, on main branch, releasable conventional commits since last tag, and tests pass."
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════"
+echo "  Phase 1: PREFLIGHT"
+echo "═══════════════════════════════════════════════════════════"
+
+# Check 1: Working directory clean
+echo "→ Checking working directory..."
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "  ✗ Working directory not clean"
+    git status --short
+    exit 1
+fi
+echo "  ✓ Working directory clean"
+
+# Check 2: On main branch
+echo "→ Checking branch..."
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "main" ]]; then
+    echo "  ✗ Not on main branch (currently on $BRANCH)"
+    exit 1
+fi
+echo "  ✓ On main branch"
+
+# Check 3: GitHub authentication (token file check - no API calls)
+echo "→ Checking GitHub authentication..."
+if [[ -z "${GH_TOKEN:-}" ]]; then
+    echo "  ✗ GH_TOKEN not set"
+    echo "    Run: eval \"\$(mise env)\" or check .mise.toml"
+    exit 1
+fi
+if [[ -z "$(echo "$GH_TOKEN" | tr -d '[:space:]')" ]]; then
+    echo "  ✗ GH_TOKEN is empty"
+    exit 1
+fi
+if [[ ! "$GH_TOKEN" =~ ^(ghp_|github_pat_) ]]; then
+    echo "  ⚠ GH_TOKEN format unusual (expected ghp_* or github_pat_*)"
+fi
+echo "  ✓ GH_TOKEN present (${#GH_TOKEN} chars)"
+
+# Check 4: Releasable commits exist
+echo "→ Checking for releasable commits..."
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [[ -n "$LATEST_TAG" ]]; then
+    COMMITS=$(git log "$LATEST_TAG"..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$COMMITS" -eq 0 ]]; then
+        echo "  ✗ No commits since $LATEST_TAG"
+        exit 1
+    fi
+    echo "  ✓ Found $COMMITS commits since $LATEST_TAG"
+else
+    echo "  ✓ No tags yet (initial release)"
+fi
+
+# Check 5: Tests pass
+echo "→ Running tests..."
+if uv run --python 3.13 pytest -q --no-header --tb=line 2>/dev/null; then
+    echo "  ✓ Tests pass"
+else
+    echo "  ✗ Tests failed"
+    exit 1
+fi
+
+echo ""
+echo "✓ All preflight checks passed"
+echo ""

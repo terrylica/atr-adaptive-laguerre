@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Execute complete 4-phase release pipeline: preflight → semantic-release version → build + push → verify. Primary entry point for releasing atr-adaptive-laguerre."
+#MISE depends=["release:preflight"]
+set -euo pipefail
+
+echo ""
+echo "╔═══════════════════════════════════════════════════════════╗"
+echo "║  atr-adaptive-laguerre Full Release Workflow              ║"
+echo "╚═══════════════════════════════════════════════════════════╝"
+echo ""
+
+# Phase 2: Version
+mise run release:version
+
+# Phase 3: Sync (build + push)
+mise run release:sync
+
+# Phase 4: Verify
+mise run release:verify
+
+echo ""
+echo "╔═══════════════════════════════════════════════════════════╗"
+echo "║  ✓ Release workflow complete!                             ║"
+echo "╚═══════════════════════════════════════════════════════════╝"
+echo ""

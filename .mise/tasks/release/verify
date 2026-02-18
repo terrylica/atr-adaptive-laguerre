@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#MISE description="Phase 4 of 4: Post-release verification. Checks: git tag exists, GitHub release published, PyPI package available, local build artifacts."
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════"
+echo "  Phase 4: VERIFY"
+echo "═══════════════════════════════════════════════════════════"
+
+VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+# Check 1: Git tag exists
+echo "→ Checking git tag..."
+if git rev-parse "v$VERSION" &>/dev/null; then
+    echo "  ✓ Tag v$VERSION exists"
+else
+    echo "  ✗ Tag v$VERSION not found"
+fi
+
+# Check 2: GitHub release exists (using curl to avoid gh CLI process storm risks)
+echo "→ Checking GitHub release..."
+RELEASE_URL="https://api.github.com/repos/terrylica/atr-adaptive-laguerre/releases/tags/v$VERSION"
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${GH_TOKEN:-}" "$RELEASE_URL" 2>/dev/null || echo "000")
+if [[ "$HTTP_STATUS" == "200" ]]; then
+    echo "  ✓ GitHub release v$VERSION exists"
+elif [[ "$HTTP_STATUS" == "404" ]]; then
+    echo "  ⚠ GitHub release v$VERSION not found (may take a moment)"
+else
+    echo "  ⚠ Could not verify GitHub release (HTTP $HTTP_STATUS)"
+fi
+
+# Check 3: PyPI availability
+echo "→ Checking PyPI..."
+PYPI_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/atr-adaptive-laguerre/$VERSION/json" 2>/dev/null || echo "000")
+if [[ "$PYPI_STATUS" == "200" ]]; then
+    echo "  ✓ PyPI atr-adaptive-laguerre==$VERSION available"
+elif [[ "$PYPI_STATUS" == "404" ]]; then
+    echo "  ⚠ Not on PyPI yet (GitHub Actions may still be running)"
+    echo "    Check: https://github.com/terrylica/atr-adaptive-laguerre/actions"
+else
+    echo "  ⚠ Could not verify PyPI (HTTP $PYPI_STATUS)"
+fi
+
+# Check 4: Local build artifacts
+echo "→ Checking build artifacts..."
+WHEEL_COUNT=$(ls dist/*"$VERSION"*.whl 2>/dev/null | wc -l | tr -d ' ')
+SDIST_COUNT=$(ls dist/*"$VERSION"*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
+echo "  ✓ Wheels: $WHEEL_COUNT, Sdists: $SDIST_COUNT"
+
+echo ""
+echo "═══════════════════════════════════════════════════════════"
+echo "  ✓ Release v$VERSION verification complete"
+echo "═══════════════════════════════════════════════════════════"
+echo ""
+echo "Post-release:"
+echo "  pip install atr-adaptive-laguerre==$VERSION"
+echo "  https://pypi.org/project/atr-adaptive-laguerre/$VERSION/"
+echo ""

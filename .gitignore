@@ -51,3 +51,6 @@ venv.bak/
 .dmypy.json
 dmypy.json
 RELEASE_NOTES_SHORT.md
+
+# mise local config (machine-specific secrets)
+.mise.local.toml

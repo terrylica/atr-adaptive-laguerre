@@ -1,0 +1,5 @@
+# atr-adaptive-laguerre mise configuration
+# Machine-specific env (GH_TOKEN) goes in .mise.local.toml (gitignored)
+
+[tools]
+node = "latest"  # semantic-release

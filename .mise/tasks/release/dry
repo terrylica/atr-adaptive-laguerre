@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Preview what semantic-release would do without making any changes. Safe to run repeatedly."
+#MISE depends=["release:preflight"]
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════"
+echo "  DRY RUN (no changes will be made)"
+echo "═══════════════════════════════════════════════════════════"
+
+/usr/bin/env bash -c 'GITHUB_TOKEN="${GH_TOKEN}" semantic-release --no-ci --dry-run'
