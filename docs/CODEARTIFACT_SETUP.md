@@ -5,6 +5,7 @@ This document explains how to configure automatic publishing to AWS CodeArtifact
 ## Overview
 
 The `atr-adaptive-laguerre` package is published to two package repositories:
+
 - **PyPI** (public): `https://pypi.org/project/atr-adaptive-laguerre/`
 - **AWS CodeArtifact** (EonLabs private): `eonlabs-050214414362.d.codeartifact.us-west-2.amazonaws.com`
 
@@ -19,6 +20,7 @@ Both are published automatically when you push a version tag (e.g., `git push or
 **Trigger:** On version tags matching `v*.*.*` pattern
 
 **Jobs:**
+
 1. `build` - Builds distributions using `uv build`
 2. `publish-codeartifact` - Authenticates to AWS and uploads to CodeArtifact
 
@@ -36,18 +38,18 @@ These credentials are used to authenticate with AWS CodeArtifact. Obtain them fr
 doppler run --project aws-credentials --config dev -- printenv | grep AWS
 ```
 
-| Secret Name | Value | Source |
-|-------------|-------|--------|
-| `AWS_ACCESS_KEY_ID` | Your AWS access key | `aws-credentials/dev` in Doppler |
+| Secret Name             | Value               | Source                           |
+| ----------------------- | ------------------- | -------------------------------- |
+| `AWS_ACCESS_KEY_ID`     | Your AWS access key | `aws-credentials/dev` in Doppler |
 | `AWS_SECRET_ACCESS_KEY` | Your AWS secret key | `aws-credentials/dev` in Doppler |
-| `AWS_REGION` | `us-west-2` | Fixed value |
-| `AWS_ACCOUNT_ID` | `050214414362` | EonLabs AWS account |
+| `AWS_REGION`            | `us-west-2`         | Fixed value                      |
+| `AWS_ACCOUNT_ID`        | `050214414362`      | EonLabs AWS account              |
 
 ### CodeArtifact Configuration
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `CODEARTIFACT_DOMAIN` | `eonlabs` | CodeArtifact domain name |
+| Secret Name               | Value                    | Description                  |
+| ------------------------- | ------------------------ | ---------------------------- |
+| `CODEARTIFACT_DOMAIN`     | `eonlabs`                | CodeArtifact domain name     |
 | `CODEARTIFACT_REPOSITORY` | `el-prediction-pipeline` | Repository within the domain |
 
 ---
@@ -71,6 +73,7 @@ EOF
 3. Add each secret from the table above:
 
 **Example - Adding AWS_ACCESS_KEY_ID:**
+
 - Name: `AWS_ACCESS_KEY_ID`
 - Value: (paste value from Doppler)
 - Click **Add secret**
@@ -85,6 +88,7 @@ gh secret list --repo terrylica/atr-adaptive-laguerre
 ```
 
 Expected output:
+
 ```
 AWS_ACCESS_KEY_ID
 AWS_ACCOUNT_ID
@@ -101,6 +105,7 @@ CODEARTIFACT_REPOSITORY
 ### Manual Test (Recommended)
 
 1. **Make a test version bump** (don't push yet):
+
    ```bash
    # Update version in pyproject.toml (e.g., 2.0.0 → 2.0.1)
    # Commit changes
@@ -109,6 +114,7 @@ CODEARTIFACT_REPOSITORY
    ```
 
 2. **Create and push a test tag**:
+
    ```bash
    git tag v2.0.1
    git push origin v2.0.1
@@ -156,6 +162,7 @@ EOF
 **Cause:** GitHub Secrets not configured or incorrect values
 
 **Solution:**
+
 - Verify all 6 secrets are present in GitHub repository settings
 - Re-check values from Doppler (especially `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`)
 - Ensure no whitespace in secret values
@@ -165,6 +172,7 @@ EOF
 **Cause:** Version already published to CodeArtifact (expected for v2.0.0)
 
 **Solution:**
+
 - Increment version number (e.g., v2.0.1, v2.1.0)
 - Rebuild and retry
 - This is expected for v2.0.0 which already exists via PyPI upstream connection
@@ -174,6 +182,7 @@ EOF
 **Cause:** AWS credentials invalid or expired
 
 **Solution:**
+
 - Refresh credentials from Doppler: `doppler run --project aws-credentials --config dev -- aws sts get-caller-identity`
 - Update GitHub Secrets with new values
 - Ensure credentials have `codeartifact:*` permissions
@@ -183,6 +192,7 @@ EOF
 **Cause:** Tag doesn't match `v*.*.*` pattern
 
 **Solution:**
+
 - Use semantic versioning: `v2.0.1`, `v2.1.0`, etc. ✅
 - Avoid: `v2.0`, `release-2.0.1`, `2.0.1` ❌
 - Verify tag was pushed: `git push origin v2.0.1`
@@ -214,11 +224,11 @@ EOF
 
 ## Files Involved
 
-| File | Purpose |
-|------|---------|
-| `.github/workflows/publish.yml` | PyPI publishing (already configured) |
-| `.github/workflows/publish-codeartifact.yml` | CodeArtifact publishing (NEW) |
-| `pyproject.toml` | Package metadata and version |
+| File                                         | Purpose                              |
+| -------------------------------------------- | ------------------------------------ |
+| `.github/workflows/publish.yml`              | PyPI publishing (already configured) |
+| `.github/workflows/publish-codeartifact.yml` | CodeArtifact publishing (NEW)        |
+| `pyproject.toml`                             | Package metadata and version         |
 
 ---
 
@@ -234,6 +244,7 @@ EOF
 ## Questions?
 
 Refer to:
+
 1. **Local publishing troubleshooting:** `/tmp/EMPIRICAL_TESTING_RESULTS.md`
 2. **CodeArtifact setup:** `/tmp/ATR_ADAPTIVE_LAGUERRE_CODEARTIFACT_PUBLISHING_PLAN.md`
 3. **AWS account details:** AWS_ACCOUNT_ID = `050214414362`, Region = `us-west-2`

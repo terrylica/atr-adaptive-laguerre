@@ -11,6 +11,7 @@
 Adversarial testing of ATR-Adaptive Laguerre RSI feature extraction pipeline confirms **100% compliance** with strict train/test separation rules. All 9 walk-forward validation tests PASSED with zero temporal leakage detected.
 
 **Critical Rules Validated**:
+
 1. ✅ Train on past; infer on future—never reuse training rows
 2. ✅ Tune only inside current training window; never use test data
 3. ✅ No cross-window peeking or retroactive refits after seeing test results
@@ -49,6 +50,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Train on past; infer on future—never reuse training rows
 
 **Validation**:
+
 - Split 1000 bars into train (0-599) and test (600-999)
 - Extracted features on each window independently
 - Verified zero index overlap between train/test features
@@ -66,12 +68,14 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Stateful indicators must be frozen after training (no retroactive updates)
 
 **Validation**:
+
 - Computed features on training window (0-599)
 - Computed features on extended window (0-699)
 - Verified training features **identical** in both computations
 - Confirmed adding future data does NOT change past features
 
 **Critical Finding**: Current implementation is **stateless by design**:
+
 - Each `fit_transform()` call creates fresh ATR state, Laguerre filter state
 - No state bleeding across windows
 - This is CORRECT for walk-forward validation (each window independent)
@@ -88,6 +92,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Features in Window 1 must NOT change when we see Window 2/3
 
 **Validation**:
+
 - Created 3 sequential windows (333 bars each)
 - Computed features on:
   - Window 1 only
@@ -107,12 +112,14 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Multi-interval resampling must NOT leak future data
 
 **Validation**:
+
 - Extracted 121 features (27 base + 27 mult1 + 27 mult2 + 40 interactions)
 - Computed on training window (0-599)
 - Computed on full data (0-999)
 - Verified base interval features **identical** in both computations
 
 **Critical Design**: Multi-interval features (mult1, mult2) are **history-dependent**:
+
 - Resampled windows depend on ATR min/max state over full history
 - This is NOT temporal leakage—it's expected behavior for stateful indicators
 - Base features remain non-anticipative (guarantee preserved)
@@ -129,6 +136,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Rolling windows must use only past data (no lookahead)
 
 **Validation**:
+
 - Created deterministic RSI pattern
 - At bar 25, manually calculated expected percentile rank using bars [6:25] (20-bar window)
 - Compared with actual `rsi_percentile_20` feature
@@ -146,6 +154,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Rule**: Forward-fill alignment must use only past values (t' ≤ t)
 
 **Validation**:
+
 - Created 240-bar dataset with 3x and 12x resampling
 - Verified mult1 features aligned via forward-fill
 - Confirmed no NaN after first complete multiplier window
@@ -180,6 +189,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 **Expected Behavior**: Raise `ValueError` (fail-fast, no silent errors)
 
 **Actual Behavior**:
+
 - With 1 bar: Raises `ValueError: rsi length (1) must be >= stats_window (20)` ✅
 - With 20 bars: Successfully extracts features ✅
 
@@ -207,21 +217,25 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 ### Stateless Design (Current Implementation)
 
 **Key Property**: Each `fit_transform()` call is **independent**:
+
 - Creates fresh ATR state (min/max tracking reset)
 - Creates fresh Laguerre filter state (L0, L1, L2, L3 = 0)
 - No shared state across calls
 
 **Advantages**:
+
 1. ✅ **Zero temporal leakage risk**: Each window isolated
 2. ✅ **Simple reasoning**: No hidden dependencies
 3. ✅ **Deterministic**: Same input → same output
 4. ✅ **Walk-forward friendly**: Natural fit for backtesting
 
 **Tradeoffs**:
+
 1. ⚠️ **Not production-ready for incremental inference**: Cannot update features bar-by-bar
 2. ⚠️ **Full recomputation required**: Must recompute entire window for each new bar
 
 **Recommendation**: Current stateless design is **ideal for backtesting and research**. For production deployment (incremental updates), would need:
+
 1. Serializable state object (ATR min/max, Laguerre filter stages)
 2. `update()` method for incremental bar-by-bar feature computation
 3. State persistence mechanism
@@ -233,6 +247,7 @@ tests/test_validation/test_walk_forward.py::TestAdversarialEdgeCases
 ### Complete Window Filtering (src/atr_adaptive_laguerre/features/multi_interval.py:214)
 
 **Implementation**:
+
 ```python
 # Keep only windows with full multiplier bars (complete windows)
 complete_mask = bar_counts == multiplier
@@ -242,11 +257,13 @@ df_resampled = df_resampled[complete_mask]
 **Effect**: Only complete resampling windows retained
 
 **Non-Anticipative Guarantee**: ✅ Prevents partial window artifacts
+
 - Incomplete windows at end of subset would have different OHLC values when completed
 - Filtering ensures feature values don't change when window completes
 - This is **critical** for progressive subset validation to pass
 
 **Example**:
+
 - Multiplier = 3, base bars 0-8
 - Subset 1 (bars 0-5): Creates partial window [3-5] → **DROPPED**
 - Subset 2 (bars 0-8): Creates complete window [3-5] → **KEPT**
@@ -258,15 +275,15 @@ df_resampled = df_resampled[complete_mask]
 
 ### Single-Interval Features (27 columns)
 
-| Category | Features | Non-Anticipative? | Validation |
-|----------|----------|-------------------|------------|
-| Base Indicator | `rsi` | ✅ YES | Uses only `close[0:t]` via stateful ATR/Laguerre |
-| Regimes | `regime`, `regime_bearish`, `regime_neutral`, `regime_bullish`, `regime_changed`, `bars_in_regime`, `regime_strength` | ✅ YES | Derived from `rsi[t]` and `rsi[t-1]` only |
-| Thresholds | `dist_overbought`, `dist_oversold`, `dist_midline`, `abs_dist_overbought`, `abs_dist_oversold` | ✅ YES | Pure functions of `rsi[t]` |
-| Crossings | `cross_above_oversold`, `cross_below_overbought`, `cross_above_midline`, `cross_below_midline` | ✅ YES | Compares `rsi[t]` with `rsi[t-1]` |
-| Temporal | `bars_since_oversold`, `bars_since_overbought`, `bars_since_extreme` | ✅ YES | Cumulative count from past events only |
-| Rate of Change | `rsi_change_1`, `rsi_change_5`, `rsi_velocity` | ✅ YES | Uses `rsi[t]` - `rsi[t-k]`, EMA with past values |
-| Statistics | `rsi_percentile_20`, `rsi_zscore_20`, `rsi_volatility_20`, `rsi_range_20` | ✅ YES | Rolling windows with `min_periods=1`, uses only past 20 bars |
+| Category       | Features                                                                                                              | Non-Anticipative? | Validation                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------ |
+| Base Indicator | `rsi`                                                                                                                 | ✅ YES            | Uses only `close[0:t]` via stateful ATR/Laguerre             |
+| Regimes        | `regime`, `regime_bearish`, `regime_neutral`, `regime_bullish`, `regime_changed`, `bars_in_regime`, `regime_strength` | ✅ YES            | Derived from `rsi[t]` and `rsi[t-1]` only                    |
+| Thresholds     | `dist_overbought`, `dist_oversold`, `dist_midline`, `abs_dist_overbought`, `abs_dist_oversold`                        | ✅ YES            | Pure functions of `rsi[t]`                                   |
+| Crossings      | `cross_above_oversold`, `cross_below_overbought`, `cross_above_midline`, `cross_below_midline`                        | ✅ YES            | Compares `rsi[t]` with `rsi[t-1]`                            |
+| Temporal       | `bars_since_oversold`, `bars_since_overbought`, `bars_since_extreme`                                                  | ✅ YES            | Cumulative count from past events only                       |
+| Rate of Change | `rsi_change_1`, `rsi_change_5`, `rsi_velocity`                                                                        | ✅ YES            | Uses `rsi[t]` - `rsi[t-k]`, EMA with past values             |
+| Statistics     | `rsi_percentile_20`, `rsi_zscore_20`, `rsi_volatility_20`, `rsi_range_20`                                             | ✅ YES            | Rolling windows with `min_periods=1`, uses only past 20 bars |
 
 **Total**: 27/27 features ✅ NON-ANTICIPATIVE
 
@@ -274,13 +291,14 @@ df_resampled = df_resampled[complete_mask]
 
 ### Multi-Interval Features (81 columns)
 
-| Interval | Features | Non-Anticipative? | Notes |
-|----------|----------|-------------------|-------|
-| Base | 27 columns `*_base` | ✅ YES | Same as single-interval features |
-| Mult1 (3×) | 27 columns `*_mult1` | ⚠️ HISTORY-DEPENDENT | Computed on resampled data with stateful indicators |
+| Interval    | Features             | Non-Anticipative?    | Notes                                               |
+| ----------- | -------------------- | -------------------- | --------------------------------------------------- |
+| Base        | 27 columns `*_base`  | ✅ YES               | Same as single-interval features                    |
+| Mult1 (3×)  | 27 columns `*_mult1` | ⚠️ HISTORY-DEPENDENT | Computed on resampled data with stateful indicators |
 | Mult2 (12×) | 27 columns `*_mult2` | ⚠️ HISTORY-DEPENDENT | Computed on resampled data with stateful indicators |
 
 **History-Dependent Explanation**:
+
 - `rsi_mult1[t]` computed on resampled 3× window
 - Resampled window uses stateful ATR (min/max tracking over full history)
 - Adding more history changes ATR state → changes `rsi_mult1[t]`
@@ -293,13 +311,13 @@ df_resampled = df_resampled[complete_mask]
 
 ### Cross-Interval Features (40 columns)
 
-| Category | Features | Non-Anticipative? | Derivation |
-|----------|----------|-------------------|------------|
-| Regime Alignment | 6 columns | ✅ YES | Derived from single-interval regime features |
-| Regime Divergence | 8 columns | ✅ YES | Derived from single-interval regime + RSI features |
-| Momentum Patterns | 6 columns | ✅ YES | Derived from single-interval RSI + change features |
-| Crossing Patterns | 8 columns | ✅ YES | Derived from single-interval crossing features |
-| Temporal Patterns | 12 columns | ✅ YES | Derived from single-interval regime + RSI features |
+| Category          | Features   | Non-Anticipative? | Derivation                                         |
+| ----------------- | ---------- | ----------------- | -------------------------------------------------- |
+| Regime Alignment  | 6 columns  | ✅ YES            | Derived from single-interval regime features       |
+| Regime Divergence | 8 columns  | ✅ YES            | Derived from single-interval regime + RSI features |
+| Momentum Patterns | 6 columns  | ✅ YES            | Derived from single-interval RSI + change features |
+| Crossing Patterns | 8 columns  | ✅ YES            | Derived from single-interval crossing features     |
+| Temporal Patterns | 12 columns | ✅ YES            | Derived from single-interval regime + RSI features |
 
 **Total**: 40/40 features ✅ NON-ANTICIPATIVE (derived from already non-anticipative single-interval features)
 
@@ -330,6 +348,7 @@ df_resampled = df_resampled[complete_mask]
 ### For Production Deployment
 
 1. **Add Incremental Update API**:
+
    ```python
    class StatefulATRAdaptiveLaguerreRSI:
        def fit(self, df: pd.DataFrame) -> None:
@@ -378,6 +397,7 @@ The ATR-Adaptive Laguerre RSI feature extraction pipeline demonstrates **exempla
 **Recommendation**: **APPROVED for production use** in walk-forward backtesting and research workflows.
 
 **Next Steps**:
+
 1. Add incremental update API for production inference (if needed)
 2. Document multi-interval history-dependence for users
 3. Create usage examples demonstrating walk-forward validation
@@ -392,6 +412,7 @@ The ATR-Adaptive Laguerre RSI feature extraction pipeline demonstrates **exempla
 **Status**: All PASSED
 
 **Feature Coverage**:
+
 - `src/atr_adaptive_laguerre/features/atr_adaptive_rsi.py`: 74% (core logic covered)
 - `src/atr_adaptive_laguerre/features/feature_expander.py`: 95% (fully tested)
 - `src/atr_adaptive_laguerre/features/multi_interval.py`: 85% (resampling logic covered)

@@ -4,27 +4,27 @@ Guidance for Claude Code when working in this repository.
 
 ## Status
 
-| Item | Value |
-|------|-------|
-| **Version** | 2.1.0 |
-| **License** | MIT |
-| **Python** | 3.10+ (managed with `uv`) |
-| **Status** | Production-ready |
+| Item        | Value                     |
+| ----------- | ------------------------- |
+| **Version** | 2.1.0                     |
+| **License** | MIT                       |
+| **Python**  | 3.10+ (managed with `uv`) |
+| **Status**  | Production-ready          |
 
 ---
 
 ## Quick Links
 
-| Topic | Document |
-|-------|----------|
-| **Installation & Features** | [docs/README.md](docs/README.md) |
-| **API Reference** | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
-| **backtesting.py Integration** | [docs/backtesting-py-integration.md](docs/backtesting-py-integration.md) |
-| **PyPI + CodeArtifact Publishing** | [docs/CODEARTIFACT_SETUP.md](docs/CODEARTIFACT_SETUP.md) |
-| **Release History** | [CHANGELOG.md](CHANGELOG.md) |
-| **Design & Architecture** | [docs/backtesting-py-integration-plan.md](docs/backtesting-py-integration-plan.md) |
-| **Feature Engineering Design** | [FEATURE_EXTRACTION_PLAN.md](FEATURE_EXTRACTION_PLAN.md) |
-| **Validation Framework** | [TEMPORAL_LEAKAGE_TEST_PLAN.md](TEMPORAL_LEAKAGE_TEST_PLAN.md) |
+| Topic                              | Document                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| **Installation & Features**        | [docs/README.md](docs/README.md)                                                   |
+| **API Reference**                  | [docs/API_REFERENCE.md](docs/API_REFERENCE.md)                                     |
+| **backtesting.py Integration**     | [docs/backtesting-py-integration.md](docs/backtesting-py-integration.md)           |
+| **PyPI + CodeArtifact Publishing** | [docs/CODEARTIFACT_SETUP.md](docs/CODEARTIFACT_SETUP.md)                           |
+| **Release History**                | [CHANGELOG.md](CHANGELOG.md)                                                       |
+| **Design & Architecture**          | [docs/backtesting-py-integration-plan.md](docs/backtesting-py-integration-plan.md) |
+| **Feature Engineering Design**     | [FEATURE_EXTRACTION_PLAN.md](FEATURE_EXTRACTION_PLAN.md)                           |
+| **Validation Framework**           | [TEMPORAL_LEAKAGE_TEST_PLAN.md](TEMPORAL_LEAKAGE_TEST_PLAN.md)                     |
 
 ---
 
@@ -67,6 +67,7 @@ See [docs/CODEARTIFACT_SETUP.md](docs/CODEARTIFACT_SETUP.md) for details and ver
 ## Architecture
 
 Three-layer Pydantic v2 API pattern:
+
 - **Layer 1**: Type definitions (`FeatureNameType` Literal with 31 features)
 - **Layer 2**: Configuration models (`IndicatorConfig`, `FeatureConfig`)
 - **Layer 3**: Implementation functions (`compute_indicator`, `compute_feature`, `make_indicator`)

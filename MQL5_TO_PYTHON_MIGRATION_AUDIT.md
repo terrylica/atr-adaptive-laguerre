@@ -10,16 +10,16 @@
 
 **Migration Status:** ✅ **CORE ALGORITHM COMPLETE** + ⚠️ **VISUAL ELEMENTS UNMAPPED**
 
-| Component | MQL5 | Python | Status | Notes |
-|-----------|------|--------|--------|-------|
-| True Range | ✅ | ✅ | EXACT MATCH | Lines 239-242 → `core/true_range.py` |
-| ATR Calculation | ✅ | ✅ | EXACT MATCH | Lines 244-287 → `core/atr.py` |
-| Min/Max Tracking | ✅ | ✅ | EXACT MATCH | Lines 268-287 → `core/atr.py` |
-| Adaptive Coefficient | ✅ | ✅ | EXACT MATCH | Lines 290-292 → `core/adaptive.py` |
-| Laguerre Filter | ✅ | ✅ | EXACT MATCH | Lines 406-412 → `core/laguerre_filter.py` |
-| Laguerre RSI | ✅ | ✅ | EXACT MATCH | Lines 415-428 → `core/laguerre_rsi.py` |
-| **Visual Elements** | ✅ | ❌ | **NOT MIGRATED** | Color coding, levels, regime zones |
-| **Feature Validation** | ❌ | ⚠️ | **PARTIAL** | IC added, but needs visual diagnostics |
+| Component              | MQL5 | Python | Status           | Notes                                     |
+| ---------------------- | ---- | ------ | ---------------- | ----------------------------------------- |
+| True Range             | ✅   | ✅     | EXACT MATCH      | Lines 239-242 → `core/true_range.py`      |
+| ATR Calculation        | ✅   | ✅     | EXACT MATCH      | Lines 244-287 → `core/atr.py`             |
+| Min/Max Tracking       | ✅   | ✅     | EXACT MATCH      | Lines 268-287 → `core/atr.py`             |
+| Adaptive Coefficient   | ✅   | ✅     | EXACT MATCH      | Lines 290-292 → `core/adaptive.py`        |
+| Laguerre Filter        | ✅   | ✅     | EXACT MATCH      | Lines 406-412 → `core/laguerre_filter.py` |
+| Laguerre RSI           | ✅   | ✅     | EXACT MATCH      | Lines 415-428 → `core/laguerre_rsi.py`    |
+| **Visual Elements**    | ✅   | ❌     | **NOT MIGRATED** | Color coding, levels, regime zones        |
+| **Feature Validation** | ❌   | ⚠️     | **PARTIAL**      | IC added, but needs visual diagnostics    |
 
 ---
 
@@ -28,6 +28,7 @@
 ### 1.1 Color-Coded Line (Trading Signals)
 
 **MQL5 Implementation:**
+
 ```mql5
 // Line 298: Color assignment based on thresholds
 valc[i] = (val[i]>inpLevelUp) ? 1 : (val[i]<inpLevelDown) ? 2 : 0;
@@ -64,6 +65,7 @@ valc[i] = (val[i]>inpLevelUp) ? 1 : (val[i]<inpLevelDown) ? 2 : 0;
 ### 1.2 Level Lines (Threshold Boundaries)
 
 **MQL5 Implementation:**
+
 ```mql5
 // Lines 136-137: Two horizontal lines at fixed levels
 IndicatorSetDouble(INDICATOR_LEVELVALUE, 0, inpLevelUp);    // 0.85
@@ -85,6 +87,7 @@ IndicatorSetDouble(INDICATOR_LEVELVALUE, 1, inpLevelDown);  // 0.15
 ### 1.3 Separate Window Display
 
 **MQL5 Implementation:**
+
 ```mql5
 // Line 5: Renders below price chart
 #property indicator_separate_window
@@ -110,18 +113,19 @@ IndicatorSetDouble(INDICATOR_LEVELVALUE, 1, inpLevelDown);  // 0.15
 
 **Verification Method:** Line-by-line comparison with MQL5 refactor version
 
-| MQL5 Lines | Python Module | Match | Verification |
-|------------|---------------|-------|--------------|
-| 239-242 | `core/true_range.py` | ✅ 100% | TR formula identical |
-| 244-259 | `core/atr.py:25-45` | ✅ 100% | Sliding window sum identical |
-| 268-287 | `core/atr.py:47-75` | ✅ 100% | Min/max tracking identical |
-| 290-292 | `core/adaptive.py:15-25` | ✅ 100% | Coefficient formula identical |
-| 295 | `core/adaptive.py:28-35` | ✅ 100% | Period = ATR_period*(coeff+0.75) |
-| 403 | `core/laguerre_filter.py:35-40` | ✅ 100% | Gamma = 1 - 10/(period+9) |
-| 406-412 | `core/laguerre_filter.py:42-70` | ✅ 100% | 4-stage cascade identical |
-| 415-428 | `core/laguerre_rsi.py:4-54` | ✅ 100% | CU/CD accumulation identical |
+| MQL5 Lines | Python Module                   | Match   | Verification                      |
+| ---------- | ------------------------------- | ------- | --------------------------------- |
+| 239-242    | `core/true_range.py`            | ✅ 100% | TR formula identical              |
+| 244-259    | `core/atr.py:25-45`             | ✅ 100% | Sliding window sum identical      |
+| 268-287    | `core/atr.py:47-75`             | ✅ 100% | Min/max tracking identical        |
+| 290-292    | `core/adaptive.py:15-25`        | ✅ 100% | Coefficient formula identical     |
+| 295        | `core/adaptive.py:28-35`        | ✅ 100% | Period = ATR_period\*(coeff+0.75) |
+| 403        | `core/laguerre_filter.py:35-40` | ✅ 100% | Gamma = 1 - 10/(period+9)         |
+| 406-412    | `core/laguerre_filter.py:42-70` | ✅ 100% | 4-stage cascade identical         |
+| 415-428    | `core/laguerre_rsi.py:4-54`     | ✅ 100% | CU/CD accumulation identical      |
 
 **Numerical Validation:**
+
 ```python
 # Test: Both implementations produce identical output
 mql5_output = [0.6352, 0.7123, ...]  # From MT5 backtest
@@ -140,20 +144,21 @@ np.allclose(mql5_output, python_output, rtol=1e-9)
 3. **Separate window rendering** (line 5)
 
 **Why Missing:**
+
 - Python library focuses on **feature values**, not **trading signals**
 - Visual elements are for discretionary trading, not ML pipelines
 - But... **visual diagnostics are critical for feature validation!**
 
 ### 2.3 Configuration Parameters: ✅ EXACT MATCH
 
-| Parameter | MQL5 Default | Python Default | Match |
-|-----------|--------------|----------------|-------|
-| ATR Period | 32 | 32 | ✅ |
-| Smoothing Period | 5 | 5 | ✅ |
-| Smoothing Method | EMA | "ema" | ✅ |
-| Level Up | 0.85 | 0.85 | ✅ |
-| Level Down | 0.15 | 0.15 | ✅ |
-| Adaptive Offset | 0.75 | 0.75 | ✅ |
+| Parameter        | MQL5 Default | Python Default | Match |
+| ---------------- | ------------ | -------------- | ----- |
+| ATR Period       | 32           | 32             | ✅    |
+| Smoothing Period | 5            | 5              | ✅    |
+| Smoothing Method | EMA          | "ema"          | ✅    |
+| Level Up         | 0.85         | 0.85           | ✅    |
+| Level Down       | 0.15         | 0.15           | ✅    |
+| Adaptive Offset  | 0.75         | 0.75           | ✅    |
 
 ---
 
@@ -162,15 +167,18 @@ np.allclose(mql5_output, python_output, rtol=1e-9)
 ### 3.1 Your Goal (From Context)
 
 **Input:**
+
 - Multi-interval OHLCV from `gapless-crypto-data`
 - Order-flow fields (optional)
 
 **Output:**
+
 - Non-anticipative features for seq2seq forecasting
 - Target: k-step-ahead excess returns
 - Validation: OOD-robust generalization
 
 **This Library's Role:**
+
 - Provides **1 feature** (ATR-Adaptive Laguerre RSI)
 - Range: [0, 1] bounded oscillator
 - Updates: O(1) incremental (for streaming)
@@ -210,6 +218,7 @@ df['regime_bullish'] = (df['regime'] == 2).astype(int)
 ```
 
 **Why This Matters:**
+
 - Seq2seq models can learn **regime-dependent patterns**
 - Example: Bullish regime → mean reversion vs trending behavior
 - Categorical regime + continuous RSI = 4 features from 1 indicator
@@ -251,6 +260,7 @@ df['bars_since_oversold'] = time_since_extreme(df['rsi'], 0.15, 'below')
 ```
 
 **Why This Matters:**
+
 - **Distance features:** Continuous measure of extremity
 - **Crossing features:** Capture regime transitions (high information events)
 - **Persistence features:** Temporal autocorrelation of regimes
@@ -282,6 +292,7 @@ check_stationarity(df['rsi'], 'ATR-Adaptive RSI')  # Should be stationary
 ```
 
 **Why This Matters:**
+
 - Non-stationary features (like raw price) → model learns spurious correlations
 - Stationary features (like RSI) → model learns robust patterns
 - Bounded [0, 1] range → no scale drift over time
@@ -296,11 +307,13 @@ check_stationarity(df['rsi'], 'ATR-Adaptive RSI')  # Should be stationary
 Spearman rank correlation between `feature[t]` and `return[t→t+k]`
 
 **Success Criteria:**
+
 - IC > 0.03: Feature has predictive power (SOTA threshold)
 - IC > 0.05: Strong predictive power
 - IC < 0: Inverse correlation (potentially useful if consistent)
 
 **Usage:**
+
 ```python
 from atr_adaptive_laguerre.validation import calculate_information_coefficient
 
@@ -319,6 +332,7 @@ else:
 ```
 
 **Multi-Horizon IC:**
+
 ```python
 # Test predictive power at multiple horizons
 horizons = [1, 5, 10, 20, 60]  # 1min, 5min, 10min, 20min, 1hr
@@ -346,6 +360,7 @@ plt.show()
 ```
 
 **Expected Pattern:**
+
 - Short horizons (1-5 bars): IC peaks (feature captures short-term momentum)
 - Medium horizons (10-20 bars): IC decays (momentum fades)
 - Long horizons (60+ bars): IC → 0 (no long-term predictive power)
@@ -356,6 +371,7 @@ plt.show()
 Drop in model performance when feature is randomly shuffled
 
 **Implementation:**
+
 ```python
 from sklearn.inspection import permutation_importance
 from sklearn.ensemble import GradientBoostingRegressor
@@ -391,6 +407,7 @@ for i, name in enumerate(feature_names):
 ```
 
 **Success Criteria:**
+
 - Feature importance > 0.01: Feature contributes to model
 - Top 10% features: Core predictive features
 - Importance ≈ 0: Redundant or noise
@@ -401,6 +418,7 @@ for i, name in enumerate(feature_names):
 Feature's temporal autocorrelation structure
 
 **Implementation:**
+
 ```python
 from statsmodels.graphics.tsaplots import plot_acf
 
@@ -414,6 +432,7 @@ plt.show()
 ```
 
 **What to Look For:**
+
 - **Feature ACF:** Slow decay → feature captures persistent regimes
 - **Returns ACF:** Fast decay → returns are weakly predictable
 - **If feature ACF > return ACF:** Feature smooths noise while preserving signal
@@ -424,6 +443,7 @@ plt.show()
 Lead-lag relationship between feature and returns
 
 **Implementation:**
+
 ```python
 from scipy.signal import correlate
 
@@ -446,6 +466,7 @@ plt.show()
 ```
 
 **What to Look For:**
+
 - **Positive lag peak:** Feature leads returns (predictive!)
 - **Negative lag peak:** Feature lags returns (reactive, not predictive)
 - **Zero lag peak:** Feature is contemporaneous (mixed predictive/reactive)
@@ -453,6 +474,7 @@ plt.show()
 ### 4.5 OOD Robustness - ✅ IMPLEMENTED (Regime-Based)
 
 **Current Implementation:**
+
 ```python
 from atr_adaptive_laguerre.validation import validate_ood_robustness
 
@@ -475,6 +497,7 @@ print(f"IC degradation: {result['ic_degradation']:.4f}")
 Regime-based OOD tests if feature works in different **market states**, but doesn't test if it works in different **time periods**.
 
 **Recommended Addition:**
+
 ```python
 # Temporal train/test split OOD
 def temporal_ood_validation(feature_fn, df, train_ratio=0.6, val_ratio=0.2):
@@ -764,6 +787,7 @@ plt.show()
 ### 6.3 Documentation ⚠️ (Needs Enhancement)
 
 **Current:**
+
 - [x] README with installation
 - [x] API docstrings
 - [ ] Visual elements guide (this document fills gap)
@@ -772,6 +796,7 @@ plt.show()
 - [ ] SOTA proxy usage guide
 
 **Recommended Additions:**
+
 ```
 docs/
 ├── README.md (current)
@@ -789,6 +814,7 @@ docs/
 ### 6.4 Examples ❌ (MISSING)
 
 **Needed:**
+
 ```python
 # examples/04_feature_validation.py
 """
@@ -860,6 +886,7 @@ Shows:
 **PyPI Readiness:** ⚠️ Needs examples + visual utilities
 
 **Next Steps:**
+
 1. Implement visualization functions from Part 5
 2. Add regime extraction helpers
 3. Create examples directory

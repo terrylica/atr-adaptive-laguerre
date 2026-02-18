@@ -53,14 +53,15 @@ uv add "atr-adaptive-laguerre[data]" --index-url <codeartifact-url>
 
 This package supports two operational modes with very different capabilities:
 
-| Mode | Features | Lookback | Use Case |
-|------|----------|----------|----------|
-| **Multi-Interval** (Recommended) | **85** | 360 bars | Production ML pipelines - includes cross-timeframe analysis |
-| **Single-Interval** | 31 | 30 bars | Minimal data requirements or single-timeframe analysis |
+| Mode                             | Features | Lookback | Use Case                                                    |
+| -------------------------------- | -------- | -------- | ----------------------------------------------------------- |
+| **Multi-Interval** (Recommended) | **85**   | 360 bars | Production ML pipelines - includes cross-timeframe analysis |
+| **Single-Interval**              | 31       | 30 bars  | Minimal data requirements or single-timeframe analysis      |
 
 ### ⚠️ Important: Multi-Interval Mode is Recommended
 
 **If you're building ML features, you want multi-interval mode (85 features)**, which includes:
+
 - Base interval features (31)
 - First multiplier interval features (31)
 - Second multiplier interval features (31)
@@ -68,6 +69,7 @@ This package supports two operational modes with very different capabilities:
 - Redundancy filtered: 133 → 85 features (48 redundant features removed)
 
 Cross-interval features detect multi-timeframe patterns like:
+
 - Regime alignment across timeframes
 - Divergence detection
 - Momentum cascades

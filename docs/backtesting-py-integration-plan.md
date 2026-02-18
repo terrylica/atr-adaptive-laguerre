@@ -11,21 +11,25 @@ Enable atr-adaptive-laguerre package as indicator for backtesting.py framework w
 ## Service Level Objectives (SLOs)
 
 ### Availability
+
 - Adapter functions callable without dependencies missing (100% when backtesting.py installed)
 - Graceful import failure with clear error message when backtesting.py not installed
 
 ### Correctness
+
 - Column mapping bidirectional accuracy: 100%
 - Non-anticipative property maintained: 100% (validated via progressive subset testing)
 - Output value range [0.0, 1.0]: 100%
 - Output length matches input length: 100%
 
 ### Observability
+
 - Clear error messages for missing columns (specify which columns missing)
 - Clear error messages for invalid data types
 - Clear error messages for invalid feature names
 
 ### Maintainability
+
 - Zero core computation changes (adapter only)
 - API surface: 3 public functions
 - Test coverage: >90% for adapter module
@@ -34,6 +38,7 @@ Enable atr-adaptive-laguerre package as indicator for backtesting.py framework w
 ## Architecture
 
 ### File Structure
+
 ```
 src/atr_adaptive_laguerre/
 ├── backtesting_adapter.py         # NEW
@@ -50,9 +55,11 @@ docs/
 ## Implementation Phases
 
 ### Phase 1: Core Adapter Module
+
 **File**: `src/atr_adaptive_laguerre/backtesting_adapter.py`
 
 **Functions**:
+
 1. `atr_laguerre_indicator(data, atr_period=14, smoothing_period=5, **kwargs) -> np.ndarray`
    - Main RSI indicator for backtesting.py
    - Handles data.df accessor or direct DataFrame
@@ -70,6 +77,7 @@ docs/
    - Sets `__name__` for plot legends
 
 **Column Mapping**:
+
 ```python
 COLUMN_MAPPING = {
     'Open': 'open',
@@ -81,6 +89,7 @@ COLUMN_MAPPING = {
 ```
 
 **Error Handling** (strict propagation):
+
 - `TypeError`: Invalid data object type → propagate
 - `ValueError`: Missing required columns → propagate with column list
 - `ValueError`: Invalid feature name → propagate with available features
@@ -89,9 +98,11 @@ COLUMN_MAPPING = {
 - No silent failures
 
 ### Phase 2: Package Integration
+
 **File**: `src/atr_adaptive_laguerre/__init__.py`
 
 **Changes**:
+
 ```python
 # Add imports
 from atr_adaptive_laguerre.backtesting_adapter import (
@@ -110,9 +121,11 @@ __all__ = [
 ```
 
 ### Phase 3: Testing
+
 **File**: `tests/test_backtesting_adapter.py`
 
 **Test Cases**:
+
 1. Basic indicator computation
 2. Column name mapping (Title case → lowercase)
 3. Data object with .df accessor
@@ -128,9 +141,11 @@ __all__ = [
 **No mocking** - use real computation with synthetic data
 
 ### Phase 4: Documentation
+
 **File**: `docs/backtesting-py-integration.md`
 
 **Sections**:
+
 1. Installation
 2. Basic usage example
 3. Multi-feature usage example
@@ -141,19 +156,23 @@ __all__ = [
 8. Comparison: backtesting vs ML use cases
 
 ### Phase 5: Version Update
+
 **Files**: `pyproject.toml`, `src/atr_adaptive_laguerre/__init__.py`
 
 **Changes**:
+
 - Version: `1.0.12` → `1.1.0` (MINOR bump per SemVer)
 - Rationale: New feature, no breaking changes
 
 ## Dependencies
 
 **Required** (already present):
+
 - pandas
 - numpy
 
 **Optional** (not added to requirements):
+
 - backtesting (user installs if needed)
 
 **Approach**: No hard dependency, graceful degradation
@@ -161,15 +180,18 @@ __all__ = [
 ## Testing Strategy
 
 ### Unit Tests
+
 - All adapter functions with synthetic data
 - Error conditions (invalid inputs)
 - Edge cases (empty DataFrames, single row)
 
 ### Integration Tests
+
 - Real backtesting.py Strategy.I() integration (if installed)
 - Skip if backtesting.py not available
 
 ### Validation Tests
+
 - Non-anticipative property (progressive subset comparison)
 - Output correctness (compare with direct fit_transform)
 - Value range validation
@@ -219,6 +241,7 @@ Coverage: 100% for backtesting_adapter.py
 ```
 
 **Warnings Resolved**:
+
 - ✅ Pydantic V2 deprecation warnings (3): Migrated `class Config:` → `ConfigDict`
   - Fixed in: `src/atr_adaptive_laguerre/features/base.py`
   - Fixed in: `src/atr_adaptive_laguerre/data/schema.py`
@@ -237,16 +260,17 @@ Coverage: 100% for backtesting_adapter.py
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|------|-----------|
-| Column name case sensitivity | Explicit mapping with validation |
-| backtesting.py API changes | Pin minimum version in docs |
-| Performance regression | No changes to core, adapter is thin wrapper |
-| Breaking changes | Purely additive, SemVer compliance |
+| Risk                         | Mitigation                                  |
+| ---------------------------- | ------------------------------------------- |
+| Column name case sensitivity | Explicit mapping with validation            |
+| backtesting.py API changes   | Pin minimum version in docs                 |
+| Performance regression       | No changes to core, adapter is thin wrapper |
+| Breaking changes             | Purely additive, SemVer compliance          |
 
 ## Timeline
 
 Estimated: 2-3 hours
+
 - Phase 1: 45 min
 - Phase 2: 10 min
 - Phase 3: 60 min
@@ -265,6 +289,7 @@ Estimated: 2-3 hours
 ### Motivation
 
 Adopt Pydantic API Documentation Standard (industry standard: 8000+ PyPI packages, 360M+ downloads/month) for:
+
 - Single source of truth (code = documentation)
 - AI-discoverable via JSON Schema
 - Runtime validation at parameter construction time
@@ -276,6 +301,7 @@ Adopt Pydantic API Documentation Standard (industry standard: 8000+ PyPI package
 **Three-Layer Pattern**:
 
 **Layer 1**: Literal types define valid parameter values
+
 ```python
 # backtesting_models.py
 FeatureNameType = Literal[
@@ -285,6 +311,7 @@ FeatureNameType = Literal[
 ```
 
 **Layer 2**: Pydantic models with Field descriptions
+
 ```python
 class IndicatorConfig(BaseModel):
     atr_period: int = Field(
@@ -301,6 +328,7 @@ class FeatureConfig(BaseModel):
 ```
 
 **Layer 3**: Rich docstrings in adapter functions
+
 ```python
 def compute_indicator(config: IndicatorConfig, data: Any) -> np.ndarray:
     """
@@ -318,6 +346,7 @@ def compute_indicator(config: IndicatorConfig, data: Any) -> np.ndarray:
 ### Breaking Changes
 
 **v1.1.0 API (DEPRECATED)**:
+
 ```python
 # Plain function parameters
 result = atr_laguerre_indicator(data, atr_period=14, smoothing_period=5)
@@ -326,6 +355,7 @@ indicator = make_atr_laguerre_indicator(atr_period=20)
 ```
 
 **v2.0.0 API (NEW)**:
+
 ```python
 # Pydantic model parameters
 config = IndicatorConfig(atr_period=14, smoothing_period=5)
@@ -340,12 +370,14 @@ indicator = make_indicator(atr_period=20)  # Validates at creation
 ### Implementation
 
 **New Files**:
+
 1. `src/atr_adaptive_laguerre/backtesting_models.py` (22 statements, 91% coverage)
    - `FeatureNameType` Literal with 31 feature names
    - `IndicatorConfig` Pydantic model
    - `FeatureConfig` Pydantic model with `supported_features()` helper
 
 **Updated Files**:
+
 1. `src/atr_adaptive_laguerre/backtesting_adapter.py` (46 statements, 96% coverage)
    - `atr_laguerre_indicator()` → `compute_indicator(config, data)`
    - `atr_laguerre_features()` → `compute_feature(config, data)`
@@ -370,6 +402,7 @@ Coverage: 96% backtesting_adapter.py, 91% backtesting_models.py
 ```
 
 **All SLO guarantees maintained**:
+
 - ✅ Correctness: Column mapping bidirectional accuracy 100%
 - ✅ Correctness: Non-anticipative property maintained 100%
 - ✅ Correctness: Output value range [0.0, 1.0]: 100%
@@ -397,6 +430,7 @@ class MyStrategy(Strategy):
 ```
 
 **Benefits of upgrade**:
+
 - Parameter validation at config creation time (fail fast)
 - IDE autocomplete for all parameters
 - Field-level descriptions via `help(IndicatorConfig)`

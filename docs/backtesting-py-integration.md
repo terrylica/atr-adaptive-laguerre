@@ -17,16 +17,19 @@ uv add atr-adaptive-laguerre backtesting
 ## SLO Guarantees
 
 ### Availability
+
 - Functions callable when backtesting.py installed: 100%
 - Import graceful failure with clear error message
 
 ### Correctness
+
 - Column mapping bidirectional accuracy: 100%
 - Non-anticipative property maintained: 100%
 - Output value range [0.0, 1.0]: 100%
 - Output length matches input length: 100%
 
 ### Observability
+
 - Clear error messages for missing columns (lists missing columns)
 - Clear error messages for invalid data types
 - Clear error messages for invalid feature names (lists available features)
@@ -49,6 +52,7 @@ def atr_laguerre_indicator(
 ```
 
 **Parameters**:
+
 - `data`: backtesting.py data object or pd.DataFrame (Title case columns required)
 - `atr_period`: ATR lookback period (default: 14)
 - `smoothing_period`: Price smoothing period (default: 5)
@@ -59,6 +63,7 @@ def atr_laguerre_indicator(
 **Returns**: np.ndarray of RSI values [0.0, 1.0]
 
 **Raises**:
+
 - `TypeError`: Invalid data object type
 - `ValueError`: Missing required columns
 
@@ -79,11 +84,13 @@ def atr_laguerre_features(
 ```
 
 **Parameters**: Same as `atr_laguerre_indicator` plus:
+
 - `feature_name`: Feature to extract (default: 'rsi')
 
 **Returns**: np.ndarray of feature values
 
 **Raises**:
+
 - `TypeError`: Invalid data object type
 - `ValueError`: Missing columns or invalid feature_name
 
@@ -254,16 +261,16 @@ print(f"Best parameters: atr_period={stats._strategy.atr_period}, "
 
 Access via `atr_laguerre_features(data, feature_name='...')`:
 
-| Category | Features |
-|----------|----------|
-| **Base** | `rsi` |
-| **Regimes** | `regime`, `regime_bearish`, `regime_neutral`, `regime_bullish`, `regime_changed`, `bars_in_regime`, `regime_strength` |
-| **Thresholds** | `dist_overbought`, `dist_oversold`, `dist_midline`, `abs_dist_overbought`, `abs_dist_oversold` |
-| **Crossings** | `cross_above_oversold`, `cross_below_overbought`, `cross_above_midline`, `cross_below_midline` |
-| **Temporal** | `bars_since_oversold`, `bars_since_overbought`, `bars_since_extreme` |
-| **Rate of Change** | `rsi_change_1`, `rsi_change_5`, `rsi_velocity` |
-| **Statistics** | `rsi_percentile_20`, `rsi_zscore_20`, `rsi_volatility_20`, `rsi_range_20` |
-| **Tail Risk** | `rsi_shock_1bar`, `extreme_regime_persistence`, `rsi_volatility_spike`, `tail_risk_score` |
+| Category           | Features                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **Base**           | `rsi`                                                                                                                 |
+| **Regimes**        | `regime`, `regime_bearish`, `regime_neutral`, `regime_bullish`, `regime_changed`, `bars_in_regime`, `regime_strength` |
+| **Thresholds**     | `dist_overbought`, `dist_oversold`, `dist_midline`, `abs_dist_overbought`, `abs_dist_oversold`                        |
+| **Crossings**      | `cross_above_oversold`, `cross_below_overbought`, `cross_above_midline`, `cross_below_midline`                        |
+| **Temporal**       | `bars_since_oversold`, `bars_since_overbought`, `bars_since_extreme`                                                  |
+| **Rate of Change** | `rsi_change_1`, `rsi_change_5`, `rsi_velocity`                                                                        |
+| **Statistics**     | `rsi_percentile_20`, `rsi_zscore_20`, `rsi_volatility_20`, `rsi_range_20`                                             |
+| **Tail Risk**      | `rsi_shock_1bar`, `extreme_regime_persistence`, `rsi_volatility_spike`, `tail_risk_score`                             |
 
 ## Data Requirements
 
@@ -308,17 +315,18 @@ df.index = pd.date_range('2024-01-01', periods=len(df), freq='1h')
 ## Non-Anticipative Guarantee
 
 All indicators maintain non-anticipative property:
+
 - Indicator value at bar `i` only uses data from bars `0` to `i-1`
 - No lookahead bias
 - Validated via progressive subset testing
 
 ## Comparison: Backtesting vs ML Use Cases
 
-| Use Case | Function | Output | Features |
-|----------|----------|--------|----------|
-| **Backtesting** | `atr_laguerre_indicator()` | Single RSI series | Simple indicator |
-| **Backtesting** | `atr_laguerre_features()` | Single feature series | Access to 31 features |
-| **ML Training** | `indicator.fit_transform_features()` | DataFrame with 31-133 columns | Full feature matrix |
+| Use Case        | Function                             | Output                        | Features              |
+| --------------- | ------------------------------------ | ----------------------------- | --------------------- |
+| **Backtesting** | `atr_laguerre_indicator()`           | Single RSI series             | Simple indicator      |
+| **Backtesting** | `atr_laguerre_features()`            | Single feature series         | Access to 31 features |
+| **ML Training** | `indicator.fit_transform_features()` | DataFrame with 31-133 columns | Full feature matrix   |
 
 Backtesting adapter provides simplified access to same computation engine used for ML feature generation.
 
