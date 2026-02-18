@@ -1,3 +1,17 @@
+# [2.2.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.1.0...v2.2.0) (2026-02-18)
+
+
+### Bug Fixes
+
+* escape lodash template vars in semantic-release exec prepareCmd ([822030b](https://github.com/terrylica/atr-adaptive-laguerre/commit/822030bef71614d15b6ff21edeeac9505c0ad90a))
+* remove mise depends to prevent triple preflight execution ([40de82f](https://github.com/terrylica/atr-adaptive-laguerre/commit/40de82ff0321d42b874e156094f91e473c3b2e3e)), closes [#MISE](https://github.com/terrylica/atr-adaptive-laguerre/issues/MISE)
+* **tests:** correct stale n_features assertion from 33 to 31 ([7d09bfc](https://github.com/terrylica/atr-adaptive-laguerre/commit/7d09bfc60800c7f66118618e7efeb543f8919358))
+
+
+### Features
+
+* scaffold mise 4-phase release pipeline with semantic-release ([4603608](https://github.com/terrylica/atr-adaptive-laguerre/commit/4603608a68851c620ec4b0d292b5cdaf7483138c))
+
 # Changelog
 
 All notable changes to RangeBar will be documented in this file.
