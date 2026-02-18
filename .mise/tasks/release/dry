@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Preview what semantic-release would do without making any changes. Safe to run repeatedly."
-#MISE depends=["release:preflight"]
+#MISE alias="release:preview"
 set -euo pipefail
 
 echo "═══════════════════════════════════════════════════════════"

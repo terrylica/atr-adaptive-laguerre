@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Phase 2 of 4: Execute semantic-release to analyze conventional commits, determine version bump, update CHANGELOG.md, create git tag, and publish GitHub release."
-#MISE depends=["release:preflight"]
+#MISE alias="release:ver"
 set -euo pipefail
 
 echo "═══════════════════════════════════════════════════════════"
