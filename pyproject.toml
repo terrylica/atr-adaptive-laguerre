@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atr-adaptive-laguerre"
-version = "2.4.0"
+version = "2.4.1"
 description = "ATR-adaptive Laguerre RSI for non-anticipative feature engineering in seq-2-seq forecasting"
 readme = "docs/README.md"
 requires-python = ">=3.10"

@@ -1,3 +1,10 @@
+## [2.4.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.4.0...v2.4.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* bars_in_regime cumsum formula bug - always returned 0 or 1 ([667c9cb](https://github.com/terrylica/atr-adaptive-laguerre/commit/667c9cbf2da88afb88d4a640484897cf92158e69)), closes [#2](https://github.com/terrylica/atr-adaptive-laguerre/issues/2)
+
 # [2.4.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.3.1...v2.4.0) (2026-02-19)
 
 
