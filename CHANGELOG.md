@@ -1,3 +1,10 @@
+## [2.3.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.3.0...v2.3.1) (2026-02-19)
+
+
+### Performance Improvements
+
+* memory efficiency refactoring with 7 optimizations ([97b2db9](https://github.com/terrylica/atr-adaptive-laguerre/commit/97b2db9c5b71f91a4c87ec9954cf4b5161cc68cc))
+
 # [2.3.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.2.0...v2.3.0) (2026-02-19)
 
 
