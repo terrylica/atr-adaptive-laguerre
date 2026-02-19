@@ -177,7 +177,7 @@ class RedundancyFilter:
             >>> RedundancyFilter.n_features_after_filtering(31)
             31
         """
-        if n_features_before in (27, 31, 33):
+        if n_features_before in (27, 31, 33, 43):
             # Single-interval mode - no cross-interval features to filter
             return n_features_before
         elif n_features_before == 121:
@@ -189,6 +189,9 @@ class RedundancyFilter:
         elif n_features_before == 139:
             # Multi-interval v1.0.9 - remove 48 redundant features
             return 91
+        elif n_features_before == 169:
+            # Multi-interval v2.3.0+ (43×3 + 40) - remove 48 redundant features
+            return 121
         else:
             # Unknown mode - return as-is
             # (May occur if custom feature selection already applied)

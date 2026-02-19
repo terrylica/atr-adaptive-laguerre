@@ -1,7 +1,7 @@
 """
 Tests for ExnessPhase7Adapter (Tier 2 session features).
 
-Validates integration of 3 session features with existing 85 RSI features.
+Validates integration of 3 session features with existing 121 RSI features.
 
 Test categories:
 1. Schema validation (Phase7 column presence)
@@ -58,21 +58,21 @@ def mock_phase7_ohlc():
 
 @pytest.fixture
 def mock_rsi_features():
-    """Generate mock RSI features (85 columns after redundancy filter)."""
+    """Generate mock RSI features (121 columns after redundancy filter)."""
     n_bars = 1000
     np.random.seed(123)
 
     timestamps = pd.date_range("2024-01-01", periods=n_bars, freq="5min")
 
-    # Mock 85 RSI features (representative sample)
+    # Mock 121 RSI features (representative sample)
     features = {
         # Base interval (sample)
         "rsi_change_1_base": np.random.normal(0, 0.1, n_bars),
         "rsi_volatility_20_base": np.random.uniform(0, 0.2, n_bars),
         "regime_bullish_base": np.random.choice([0, 1], n_bars, p=[0.7, 0.3]),
         "bars_in_regime_base": np.random.randint(0, 20, n_bars),
-        # Add more features to reach 85...
-        **{f"feature_{i}": np.random.randn(n_bars) for i in range(81)},
+        # Add more features to reach 121...
+        **{f"feature_{i}": np.random.randn(n_bars) for i in range(117)},
     }
 
     return pd.DataFrame(features, index=timestamps)
@@ -176,11 +176,11 @@ class TestIntegration:
             mock_rsi_features, mock_phase7_ohlc
         )
 
-        # Validate shape (85 RSI + 3 session = 88 total)
-        assert combined.shape == (1000, 88)
+        # Validate shape (121 RSI + 3 session = 124 total)
+        assert combined.shape == (1000, 124)
 
         # Validate column count
-        assert len(combined.columns) == 88
+        assert len(combined.columns) == 124
 
         # Validate index alignment
         assert combined.index.equals(mock_rsi_features.index)
@@ -201,13 +201,13 @@ class TestIntegration:
 
     def test_combine_wrong_rsi_count_raises(self, mock_phase7_ohlc):
         """Test that wrong RSI feature count raises ValueError."""
-        # Create RSI features with wrong number of columns (should be 85)
+        # Create RSI features with wrong number of columns (should be 121)
         wrong_rsi = pd.DataFrame(
-            np.random.randn(1000, 100),  # 100 instead of 85
+            np.random.randn(1000, 100),  # 100 instead of 121
             index=mock_phase7_ohlc.index,
         )
 
-        with pytest.raises(ValueError, match="should have 85 columns"):
+        with pytest.raises(ValueError, match="should have 121 columns"):
             ExnessPhase7Adapter.combine_with_rsi_features(wrong_rsi, mock_phase7_ohlc)
 
 
@@ -328,9 +328,9 @@ class TestEndToEndIntegration:
         )
 
         # Critical assertion: Must have exactly 88 features
-        # 85 (RSI) + 3 (session) = 88
-        assert len(combined.columns) == 88, (
-            f"Expected 88 features (85 RSI + 3 session), got {len(combined.columns)}"
+        # 121 (RSI) + 3 (session) = 124
+        assert len(combined.columns) == 124, (
+            f"Expected 124 features (121 RSI + 3 session), got {len(combined.columns)}"
         )
 
         # Validate no NaN values

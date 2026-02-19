@@ -65,6 +65,23 @@ FeatureNameType = Literal[
     "extreme_regime_persistence",
     "rsi_volatility_spike",
     "tail_risk_score",
+    # Adaptive features
+    "adaptive_coeff",
+    "adaptive_coeff_roc_1",
+    "gamma_value",
+    "gamma_spread",
+    # Laguerre stage features
+    "laguerre_spread",
+    "laguerre_mid_convergence",
+    "laguerre_slope",
+    # ATR range features
+    "atr_range_width",
+    # Efficiency features
+    "efficiency_ratio",
+    "efficiency_trend",
+    # Cycle features
+    "cycle_phase",
+    "cycle_phase_changed",
 ]
 
 

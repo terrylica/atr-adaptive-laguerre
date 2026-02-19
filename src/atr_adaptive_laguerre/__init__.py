@@ -32,6 +32,7 @@ from atr_adaptive_laguerre.features import (  # noqa: F401
     CrossIntervalFeatures,
     FeatureConfig,
     FeatureExpander,
+    IntermediateValues,
     MultiIntervalProcessor,
 )
 
@@ -76,6 +77,7 @@ __all__ = (
         "BaseFeature",
         "FeatureConfig",
         "FeatureExpander",
+        "IntermediateValues",
         "MultiIntervalProcessor",
         "CrossIntervalFeatures",
         # Validation

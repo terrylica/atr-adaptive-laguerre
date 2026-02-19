@@ -1,5 +1,5 @@
 """
-Validation tests for feature extraction pipeline (31 + 133 features).
+Validation tests for feature extraction pipeline (43 + 169 features).
 
 SLOs:
 - Availability: 99.9% (all tests must pass in CI)
@@ -537,23 +537,23 @@ class TestCrossIntervalFeatures:
 
 
 class TestFullFeaturePipeline:
-    """Test full feature extraction pipeline (133 features)."""
+    """Test full feature extraction pipeline (169 features)."""
 
     def test_all_features_non_anticipative(self, sample_ohlcv: pd.DataFrame) -> None:
         """
-        Test 133-feature pipeline preserves non-anticipative guarantee.
+        Test 169-feature pipeline preserves non-anticipative guarantee.
 
         Note: Multi-interval features (e.g., rsi_mult1, rsi_mult2) are history-dependent
         because they're computed on resampled data with stateful indicators (ATR, Laguerre).
         This is NOT lookahead bias - it's expected behavior.
 
         We verify non-anticipative property by testing:
-        1. Base interval features (31 columns with _base suffix) are non-anticipative
+        1. Base interval features (43 columns with _base suffix) are non-anticipative
         2. Cross-interval interactions derived from base features are deterministic
-        3. Output shape is correct (133 columns)
+        3. Output shape is correct (169 columns)
         """
         # Configure multi-interval extraction with smaller periods to fit in sample data
-        # Explicitly disable filtering to test all 133 features
+        # Explicitly disable filtering to test all 169 features
         config = ATRAdaptiveLaguerreRSIConfig(
             atr_period=14,
             smoothing_period=5,
@@ -563,16 +563,16 @@ class TestFullFeaturePipeline:
         )
         feature = ATRAdaptiveLaguerreRSI(config)
 
-        # Compute full 133 features
+        # Compute full 169 features
         features_full = feature.fit_transform_features(sample_ohlcv)
 
         # Verify output shape
-        assert features_full.shape[1] == 133
+        assert features_full.shape[1] == 169
         assert len(features_full) == len(sample_ohlcv)
 
         # Extract base interval columns (those ending with _base)
         base_cols = [col for col in features_full.columns if col.endswith("_base")]
-        assert len(base_cols) == 31  # Should have 31 base features
+        assert len(base_cols) == 43  # Should have 43 base features
 
         # Test that base features are non-anticipative
         test_lengths = [

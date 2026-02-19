@@ -1,3 +1,4 @@
+# FILE-SIZE-OK: Orchestrator module — core loop + feature pipeline must stay together
 """
 ATR-Adaptive Laguerre RSI feature constructor.
 
@@ -40,6 +41,7 @@ from atr_adaptive_laguerre.core.true_range import TrueRangeState
 from atr_adaptive_laguerre.features.base import BaseFeature, FeatureConfig
 from atr_adaptive_laguerre.features.cross_interval import CrossIntervalFeatures
 from atr_adaptive_laguerre.features.feature_expander import FeatureExpander
+from atr_adaptive_laguerre.features.intermediates import IntermediateValues
 from atr_adaptive_laguerre.features.multi_interval import MultiIntervalProcessor
 
 
@@ -89,7 +91,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
     )
     filter_redundancy: bool = Field(
         default=True,
-        description="Apply redundancy filtering (reduces 133→85 features, |ρ|>0.9 removed)",
+        description="Apply redundancy filtering (reduces 169→121 features, |ρ|>0.9 removed)",
     )
     availability_column: Optional[str] = Field(
         default=None,
@@ -133,7 +135,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create single-interval configuration (31 features).
+        Create single-interval configuration (43 features).
 
         Features: Base RSI, regime classification, crossings, momentum, statistics, tail risk.
         Lookback: ~30 periods
@@ -172,7 +174,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         **kwargs
     ) -> "ATRAdaptiveLaguerreRSIConfig":
         """
-        Create multi-interval configuration (85 features by default).
+        Create multi-interval configuration (121 features by default).
 
         Features:
         - Base interval (31): All single-interval features with _base suffix
@@ -180,8 +182,8 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
         - Multiplier 2 (31): Features at {multiplier_2}× timeframe with _mult2 suffix
         - Cross-interval (40): Regime alignment, divergence, momentum patterns
 
-        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 85 features).
-        Set filter_redundancy=False to get all 133 features.
+        Default: Redundancy filtering enabled (removes 48 features with |ρ| > 0.9, outputs 121 features).
+        Set filter_redundancy=False to get all 169 features.
 
         Lookback: ~360 periods (calculated as base_lookback × max_multiplier)
 
@@ -191,7 +193,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             atr_period: ATR lookback period (default: 14)
             smoothing_period: Price smoothing period (default: 5)
             date_column: Name of datetime column (default: 'date')
-            filter_redundancy: Apply redundancy filtering (default: True, outputs 85 features)
+            filter_redundancy: Apply redundancy filtering (default: True, outputs 121 features)
             availability_column: Column for data availability timestamps (default: None).
                                Set to prevent data leakage with delayed data (e.g., 'actual_ready_time')
             **kwargs: Additional config parameters
@@ -200,7 +202,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             Config for 85-feature output (or 133 if filter_redundancy=False)
 
         Example:
-            >>> # Default: redundancy filtering enabled (85 features)
+            >>> # Default: redundancy filtering enabled (121 features)
             >>> config = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,  # 4h
             ...     multiplier_2=12  # 12h
@@ -208,7 +210,7 @@ class ATRAdaptiveLaguerreRSIConfig(FeatureConfig):
             >>> indicator = ATRAdaptiveLaguerreRSI(config)
             >>> indicator.n_features  # 85
 
-            >>> # Disable filtering to get all 133 features
+            >>> # Disable filtering to get all 169 features
             >>> config_unfiltered = ATRAdaptiveLaguerreRSIConfig.multi_interval(
             ...     multiplier_1=4,
             ...     multiplier_2=12,
@@ -275,12 +277,12 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         super().__init__(config)
         self.config: ATRAdaptiveLaguerreRSIConfig = config
 
-        # Warn users if they're using single-interval mode (31 features)
-        # Multi-interval mode (85 features) includes 40 powerful cross-interval analysis features
+        # Warn users if they're using single-interval mode (43 features)
+        # Multi-interval mode (121 features) includes 40 powerful cross-interval analysis features
         if self.config.multiplier_1 is None or self.config.multiplier_2 is None:
             warnings.warn(
-                "Using single-interval mode (31 features). "
-                "For multi-timeframe analysis with 85 features including 40 cross-interval "
+                "Using single-interval mode (43 features). "
+                "For multi-timeframe analysis with 121 features including 40 cross-interval "
                 "features (regime alignment, divergence detection, momentum cascades), "
                 "use: ATRAdaptiveLaguerreRSIConfig.multi_interval(). "
                 "See docs for feature comparison.",
@@ -329,44 +331,8 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         MQL5 Reference: lines 232-295 (main calculation loop in OnCalculate)
         """
-        # Validate input type (raise TypeError if not DataFrame)
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError(f"df must be pd.DataFrame, got {type(df)}")
-
-        # Extract datetime information from multiple sources
-        date_col = self.config.date_column
-        if date_col in df.columns:
-            # Use specified column
-            timestamps = pd.to_datetime(df[date_col])
-            if not timestamps.is_monotonic_increasing:
-                raise ValueError(
-                    f"DataFrame must be sorted chronologically (ascending {date_col})"
-                )
-        elif isinstance(df.index, pd.DatetimeIndex):
-            # Use datetime index
-            timestamps = df.index
-            if not timestamps.is_monotonic_increasing:
-                raise ValueError(
-                    "DataFrame datetime index must be sorted chronologically (ascending)"
-                )
-        else:
-            # Error with helpful context
-            raise ValueError(
-                f"DataFrame must have datetime column '{date_col}' or DatetimeIndex.\n"
-                f"\nAvailable columns: {list(df.columns)}\n"
-                f"Index type: {type(df.index).__name__}\n"
-                f"\nHint: Pass date_column='your_column' to config, or use DatetimeIndex."
-            )
-
-        # Validate required OHLCV columns
-        required_cols = ["open", "high", "low", "close", "volume"]
-        missing = set(required_cols) - set(df.columns)
-        if missing:
-            raise ValueError(
-                f"DataFrame missing required OHLCV columns: {missing}\n"
-                f"\nAvailable columns: {list(df.columns)}\n"
-                f"Required: {required_cols}"
-            )
+        # Validate OHLCV schema
+        self._validate_ohlcv(df)
 
         # Validate sufficient lookback for base RSI calculation
         # Note: fit_transform() only needs base_lookback, not full min_lookback
@@ -386,23 +352,86 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
                 f"Hint: Provide at least {base_lookback} historical bars."
             )
 
-        # Extract OHLC arrays
+        # Compute core loop (captures all intermediate values)
+        rsi_values, _intermediates = self._compute_core_loop(df)
+
+        # Return as Series with same index as input
+        return pd.Series(rsi_values, index=df.index, name="atr_adaptive_laguerre_rsi")
+
+    def _validate_ohlcv(self, df: pd.DataFrame) -> None:
+        """Validate OHLCV DataFrame has required columns and datetime ordering."""
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"df must be pd.DataFrame, got {type(df)}")
+
+        date_col = self.config.date_column
+        if date_col in df.columns:
+            timestamps = pd.to_datetime(df[date_col])
+            if not timestamps.is_monotonic_increasing:
+                raise ValueError(
+                    f"DataFrame must be sorted chronologically (ascending {date_col})"
+                )
+        elif isinstance(df.index, pd.DatetimeIndex):
+            if not df.index.is_monotonic_increasing:
+                raise ValueError(
+                    "DataFrame datetime index must be sorted chronologically (ascending)"
+                )
+        else:
+            raise ValueError(
+                f"DataFrame must have datetime column '{date_col}' or DatetimeIndex.\n"
+                f"\nAvailable columns: {list(df.columns)}\n"
+                f"Index type: {type(df.index).__name__}\n"
+                f"\nHint: Pass date_column='your_column' to config, or use DatetimeIndex."
+            )
+
+        required_cols = ["open", "high", "low", "close", "volume"]
+        missing = set(required_cols) - set(df.columns)
+        if missing:
+            raise ValueError(
+                f"DataFrame missing required OHLCV columns: {missing}\n"
+                f"\nAvailable columns: {list(df.columns)}\n"
+                f"Required: {required_cols}"
+            )
+
+    def _compute_core_loop(
+        self, df: pd.DataFrame
+    ) -> tuple[np.ndarray, IntermediateValues]:
+        """
+        Core computation loop: TR -> ATR -> adaptive coeff -> Laguerre -> RSI.
+
+        Captures all intermediate values for feature expansion.
+        Matches MQL5 lines 232-295 exactly.
+
+        Args:
+            df: Validated OHLCV DataFrame (validation done by caller).
+
+        Returns:
+            Tuple of (rsi_values array, IntermediateValues with all intermediates).
+        """
         high = df["high"].values
         low = df["low"].values
         close = df["close"].values
+        n = len(df)
 
         # Initialize stateful calculators
         tr_state = TrueRangeState()
         atr_state = ATRState(period=self.config.atr_period)
         laguerre_state = LaguerreFilterState()
 
-        # Pre-allocate output array
-        rsi_values = np.zeros(len(df), dtype=np.float64)
+        # Pre-allocate output and intermediate arrays
+        rsi_values = np.zeros(n, dtype=np.float64)
+        adaptive_coeff_arr = np.zeros(n, dtype=np.float64)
+        gamma_arr = np.zeros(n, dtype=np.float64)
+        L0_arr = np.zeros(n, dtype=np.float64)
+        L1_arr = np.zeros(n, dtype=np.float64)
+        L2_arr = np.zeros(n, dtype=np.float64)
+        L3_arr = np.zeros(n, dtype=np.float64)
+        min_atr_arr = np.zeros(n, dtype=np.float64)
+        max_atr_arr = np.zeros(n, dtype=np.float64)
+        atr_arr = np.zeros(n, dtype=np.float64)
 
         # Main calculation loop (matches MQL5 lines 232-295)
-        for i in range(len(df)):
+        for i in range(n):
             # Step 1: Calculate True Range (matches lines 239-242)
-            # Non-anticipative: TR[i] uses close[i-1], not close[i]
             tr = tr_state.update(high[i], low[i], close[i])
 
             # Step 2: Update ATR state (matches lines 244-287)
@@ -412,25 +441,46 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             adaptive_coeff = calculate_adaptive_coefficient(atr, min_atr, max_atr)
 
             # Step 4: Calculate adaptive period (matches line 295)
-            # MQL5: inpAtrPeriod*(_coeff+0.75)
             adaptive_period = calculate_adaptive_period(
                 base_period=float(self.config.atr_period),
                 coefficient=adaptive_coeff,
                 offset=self.config.adaptive_offset,
             )
 
-            # Step 5: Calculate Laguerre gamma for adaptive period (matches line 403)
+            # Step 5: Calculate Laguerre gamma (matches line 403)
             gamma = calculate_gamma(adaptive_period)
 
             # Step 6: Update Laguerre filter (matches lines 406-412)
-            # Use close price as input (matches MQL5 prices[i])
             L0, L1, L2, L3 = laguerre_state.update(close[i], gamma)
 
             # Step 7: Calculate Laguerre RSI (matches lines 415-428)
             rsi_values[i] = calculate_laguerre_rsi(L0, L1, L2, L3)
 
-        # Return as Series with same index as input
-        return pd.Series(rsi_values, index=df.index, name="atr_adaptive_laguerre_rsi")
+            # Capture intermediate values
+            adaptive_coeff_arr[i] = adaptive_coeff
+            gamma_arr[i] = gamma
+            L0_arr[i] = L0
+            L1_arr[i] = L1
+            L2_arr[i] = L2
+            L3_arr[i] = L3
+            min_atr_arr[i] = min_atr
+            max_atr_arr[i] = max_atr
+            atr_arr[i] = atr
+
+        intermediates = IntermediateValues(
+            adaptive_coeff=adaptive_coeff_arr,
+            gamma=gamma_arr,
+            L0=L0_arr,
+            L1=L1_arr,
+            L2=L2_arr,
+            L3=L3_arr,
+            min_atr=min_atr_arr,
+            max_atr=max_atr_arr,
+            atr=atr_arr,
+            close=close.copy(),
+        )
+
+        return rsi_values, intermediates
 
     @property
     def min_lookback(self) -> int:
@@ -493,14 +543,14 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             >>> indicator_filtered.n_features  # 85
         """
         if self.config.multiplier_1 is not None and self.config.multiplier_2 is not None:
-            # Multi-interval: 31×3 + 40 cross-interval = 133
-            # With redundancy filtering: 133 - 48 = 85
-            base_count = 133
+            # Multi-interval: 43×3 + 40 cross-interval = 169
+            # With redundancy filtering: 169 - 48 = 121
+            base_count = 169
             if self.config.filter_redundancy:
                 from .redundancy_filter import RedundancyFilter
                 return RedundancyFilter.n_features_after_filtering(base_count)
             return base_count
-        return 31  # Single-interval
+        return 43  # Single-interval (31 base + 12 intermediate-based)
 
     @property
     def feature_mode(self) -> str:
@@ -600,6 +650,62 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         return rsi
 
+    def update_full(self, ohlcv_row: dict) -> tuple[float, dict]:
+        """
+        Update indicator with full intermediate values (O(1) incremental).
+
+        Same as update() but also returns intermediate values for the bar.
+
+        Args:
+            ohlcv_row: Dictionary with keys: 'open', 'high', 'low', 'close', 'volume'
+
+        Returns:
+            Tuple of (rsi_value, intermediates_dict) where intermediates_dict has keys:
+            adaptive_coeff, gamma, L0, L1, L2, L3, min_atr, max_atr, atr
+        """
+        required_keys = ['open', 'high', 'low', 'close', 'volume']
+        missing = set(required_keys) - set(ohlcv_row.keys())
+        if missing:
+            raise ValueError(
+                f"ohlcv_row missing required keys: {missing}\n"
+                f"Available keys: {list(ohlcv_row.keys())}\n"
+                f"Required: {required_keys}"
+            )
+
+        if self._tr_state is None:
+            self._tr_state = TrueRangeState()
+            self._atr_state = ATRState(period=self.config.atr_period)
+            self._laguerre_state = LaguerreFilterState()
+
+        high = float(ohlcv_row['high'])
+        low = float(ohlcv_row['low'])
+        close = float(ohlcv_row['close'])
+
+        tr = self._tr_state.update(high, low, close)
+        atr, min_atr, max_atr = self._atr_state.update(tr)
+        adaptive_coeff = calculate_adaptive_coefficient(atr, min_atr, max_atr)
+        adaptive_period = calculate_adaptive_period(
+            base_period=float(self.config.atr_period),
+            coefficient=adaptive_coeff,
+            offset=self.config.adaptive_offset,
+        )
+        gamma = calculate_gamma(adaptive_period)
+        L0, L1, L2, L3 = self._laguerre_state.update(close, gamma)
+        rsi = calculate_laguerre_rsi(L0, L1, L2, L3)
+
+        self._history.append(ohlcv_row)
+
+        intermediates_dict = {
+            "adaptive_coeff": adaptive_coeff,
+            "gamma": gamma,
+            "L0": L0, "L1": L1, "L2": L2, "L3": L3,
+            "min_atr": min_atr,
+            "max_atr": max_atr,
+            "atr": atr,
+        }
+
+        return rsi, intermediates_dict
+
     def validate_non_anticipative(
         self, df: pd.DataFrame, n_shuffles: int = 100
     ) -> bool:
@@ -682,10 +788,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
     def fit_transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Transform OHLCV to full feature matrix (31 or 133 columns).
+        Transform OHLCV to full feature matrix (43 or 169 columns).
 
-        Returns 31 single-interval features if multipliers not provided,
-        or 133 features (31 × 3 intervals + 40 cross-interval) if multipliers provided.
+        Returns 43 single-interval features if multipliers not provided,
+        or 169 features (43 × 3 intervals + 40 cross-interval) if multipliers provided.
 
         Args:
             df: OHLCV DataFrame at base interval
@@ -752,19 +858,25 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
                     f"to ensure each resampled interval has sufficient data."
                 )
 
-        # Compute base RSI
-        rsi_base = self.fit_transform(df)
+        # Validate OHLCV schema (same validation as fit_transform)
+        self._validate_ohlcv(df)
 
-        # Expand to 27 single-interval features
+        # Compute base RSI with intermediates
+        rsi_values, intermediates = self._compute_core_loop(df)
+        rsi_base = pd.Series(
+            rsi_values, index=df.index, name="atr_adaptive_laguerre_rsi"
+        )
+
+        # Expand to 43 single-interval features (31 base + 12 intermediate-based)
         expander = FeatureExpander(
             level_up=self.config.level_up,
             level_down=self.config.level_down,
             stats_window=20,  # Fixed for now
             velocity_span=5,  # Fixed for now
         )
-        features_base = expander.expand(rsi_base)
+        features_base = expander.expand(rsi_base, intermediates)
 
-        # If no multipliers, return 27 features
+        # If no multipliers, return 43 features
         if mult1 is None:
             return features_base
 
@@ -780,9 +892,17 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             date_column=self.config.date_column
         )
 
-        # Resample and extract features (returns 81 columns: 27 × 3)
+        def _extract_with_intermediates(ohlcv: pd.DataFrame) -> pd.DataFrame:
+            """Extract features with intermediates for each interval."""
+            rsi_arr, intm = self._compute_core_loop(ohlcv)
+            rsi_series = pd.Series(
+                rsi_arr, index=ohlcv.index, name="atr_adaptive_laguerre_rsi"
+            )
+            return expander.expand(rsi_series, intm)
+
+        # Resample and extract features (returns 129 columns: 43 × 3)
         features_all_intervals = processor.resample_and_extract(
-            df, lambda ohlcv: expander.expand(self.fit_transform(ohlcv))
+            df, _extract_with_intermediates
         )
 
         # Extract cross-interval interactions (40 columns)
@@ -800,10 +920,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             features_base_cols, features_mult1_cols, features_mult2_cols
         )
 
-        # Combine all features: 81 interval features + 40 interactions = 121
+        # Combine all features: 129 interval features + 40 interactions = 169
         features_final = pd.concat([features_all_intervals, interactions], axis=1)
 
-        # Apply redundancy filtering if enabled (121 → 79)
+        # Apply redundancy filtering if enabled (169 → 121)
         if self.config.filter_redundancy:
             from .redundancy_filter import RedundancyFilter
             features_final = RedundancyFilter.filter(features_final, apply_filter=True)
@@ -855,7 +975,9 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         )
 
         # Compute base interval features (always available)
-        features_base = expander.expand(self.fit_transform(df)).add_suffix("_base")
+        rsi_arr, intermediates = self._compute_core_loop(df)
+        rsi_base = pd.Series(rsi_arr, index=df.index, name="atr_adaptive_laguerre_rsi")
+        features_base = expander.expand(rsi_base, intermediates).add_suffix("_base")
 
         # Validate that availability column is sorted (required for O(n) incremental approach)
         if not df[avail_col].is_monotonic_increasing:
@@ -876,12 +998,16 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         # Pre-compute features for all resampled intervals (one-time cost)
         min_required = 30
         if len(df_mult1_full) >= min_required:
-            features_mult1_all = expander.expand(self.fit_transform(df_mult1_full))
+            rsi_arr1, intm1 = self._compute_core_loop(df_mult1_full)
+            rsi_s1 = pd.Series(rsi_arr1, index=df_mult1_full.index, name="atr_adaptive_laguerre_rsi")
+            features_mult1_all = expander.expand(rsi_s1, intm1)
         else:
             features_mult1_all = None
 
         if len(df_mult2_full) >= min_required:
-            features_mult2_all = expander.expand(self.fit_transform(df_mult2_full))
+            rsi_arr2, intm2 = self._compute_core_loop(df_mult2_full)
+            rsi_s2 = pd.Series(rsi_arr2, index=df_mult2_full.index, name="atr_adaptive_laguerre_rsi")
+            features_mult2_all = expander.expand(rsi_s2, intm2)
         else:
             features_mult2_all = None
 

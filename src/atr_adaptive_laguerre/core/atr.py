@@ -65,30 +65,32 @@ class ATRState:
         """
         Update min/max ATR tracking over lookback period.
 
-        Exact implementation from MQL5 lines 268-286:
-        - Initialize with previous ATR if period > 1
-        - Look back over period-1 bars to find min/max
-        - Otherwise use current ATR for both
+        O(n) backward accumulation replacing O(n²) list-slice approach.
+        Computes sum(tr_buffer[-k:]) / k for k=1..n incrementally:
+        at k=1: running_sum = buf[-1], atr_1 = buf[-1]/1
+        at k=2: running_sum += buf[-2], atr_2 = (buf[-1]+buf[-2])/2
+        ...identical results to the original list-slice approach.
+
+        Matches MQL5 lines 268-286 semantics.
         """
-        if self.period > 1 and len(self.tr_buffer) >= 2:
-            # Calculate historical ATR values for lookback
-            # Need to reconstruct ATR values from TR buffer
-            atr_values = [self.atr]  # Start with current
-
-            # Look back over previous bars (k=2 to period)
-            # MQL5 uses i-k indexing, we calculate from end of buffer
-            for k in range(2, min(self.period, len(self.tr_buffer)) + 1):
-                # Calculate ATR at position -k from current
-                lookback_trs = list(self.tr_buffer)[-k:]
-                if lookback_trs:
-                    atr_k = sum(lookback_trs) / len(lookback_trs)
-                    atr_values.append(atr_k)
-
-            self.min_atr = min(atr_values)
-            self.max_atr = max(atr_values)
-        else:
-            # Not enough data: use current ATR
+        n = min(self.period, len(self.tr_buffer))
+        if n < 2:
             self.min_atr = self.max_atr = self.atr
+            return
+
+        buf = list(self.tr_buffer)  # One O(n) conversion
+        running_sum = 0.0
+        min_atr = float("inf")
+        max_atr = float("-inf")
+        for k in range(1, n + 1):
+            running_sum += buf[-k]
+            atr_k = running_sum / k
+            if atr_k < min_atr:
+                min_atr = atr_k
+            if atr_k > max_atr:
+                max_atr = atr_k
+        self.min_atr = min_atr
+        self.max_atr = max_atr
 
     def reset(self) -> None:
         """Reset state for new data stream."""

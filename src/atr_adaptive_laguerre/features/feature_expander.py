@@ -12,15 +12,20 @@ Error Handling: raise_and_propagate
 - Propagate all pandas/numpy errors
 """
 
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
 
+if TYPE_CHECKING:
+    from atr_adaptive_laguerre.features.intermediates import IntermediateValues
+
 
 class FeatureExpander:
     """
-    Expand single RSI column to 31 feature columns.
+    Expand single RSI column to 31 base feature columns (43 with intermediates).
 
     Categories:
     1. Base indicator (1): rsi
@@ -73,29 +78,25 @@ class FeatureExpander:
         self.stats_window = stats_window
         self.velocity_span = velocity_span
 
-    def expand(self, rsi: pd.Series) -> pd.DataFrame:
+    def expand(
+        self,
+        rsi: pd.Series,
+        intermediates: IntermediateValues | None = None,
+    ) -> pd.DataFrame:
         """
-        Expand RSI to 31 feature columns.
+        Expand RSI to feature columns.
+
+        Returns 31 columns when intermediates is None (backward compat),
+        or 43 columns when intermediates are provided.
 
         Args:
             rsi: RSI values (must be pd.Series with float values in [0, 1])
+            intermediates: Per-bar intermediate values from core computation loop.
+                When provided, adds 12 additional features (adaptive, laguerre,
+                ATR range, efficiency, cycle phase).
 
         Returns:
-            DataFrame with 31 columns:
-            - rsi (base)
-            - regime, regime_bearish, regime_neutral, regime_bullish,
-              regime_changed, bars_in_regime, regime_strength (7)
-            - dist_overbought, dist_oversold, dist_midline,
-              abs_dist_overbought, abs_dist_oversold (5)
-            - cross_above_oversold, cross_below_overbought,
-              cross_above_midline, cross_below_midline (4)
-            - bars_since_oversold, bars_since_overbought,
-              bars_since_extreme (3)
-            - rsi_change_1, rsi_change_5, rsi_velocity (3)
-            - rsi_percentile_20, rsi_zscore_20, rsi_volatility_20,
-              rsi_range_20 (4)
-            - rsi_shock_1bar, extreme_regime_persistence,
-              rsi_volatility_spike, tail_risk_score (4)
+            DataFrame with 31 columns (no intermediates) or 43 columns (with).
 
         Raises:
             ValueError: If rsi not pd.Series
@@ -127,20 +128,27 @@ class FeatureExpander:
         # Extract tail risk features (requires previously extracted features)
         tail_risk = self._extract_tail_risk(rsi, regimes, roc, statistics)
 
-        # Combine all features
-        features = pd.concat(
-            [
-                pd.DataFrame({"rsi": rsi}),
-                regimes,
-                thresholds,
-                crossings,
-                temporal,
-                roc,
-                statistics,
-                tail_risk,
-            ],
-            axis=1,
-        )
+        # Combine base features (31 columns)
+        parts = [
+            pd.DataFrame({"rsi": rsi}),
+            regimes,
+            thresholds,
+            crossings,
+            temporal,
+            roc,
+            statistics,
+            tail_risk,
+        ]
+
+        # Intermediate-based features (+12 columns when available)
+        if intermediates is not None:
+            parts.append(self._extract_adaptive_features(rsi.index, intermediates))
+            parts.append(self._extract_laguerre_stage_features(rsi.index, intermediates))
+            parts.append(self._extract_atr_range_features(rsi.index, intermediates))
+            parts.append(self._extract_efficiency_features(rsi.index, intermediates))
+            parts.append(self._extract_cycle_features(rsi.index, intermediates))
+
+        features = pd.concat(parts, axis=1)
 
         return features
 
@@ -446,4 +454,157 @@ class FeatureExpander:
                 "rsi_volatility_spike": rsi_volatility_spike,
                 "tail_risk_score": tail_risk_score,
             }
+        )
+
+    # --- Intermediate-based feature extractors (Groups A + D) ---
+
+    def _extract_adaptive_features(
+        self, index: pd.Index, intermediates: IntermediateValues
+    ) -> pd.DataFrame:
+        """
+        Extract 4 adaptive coefficient and gamma features.
+
+        Non-anticipative: adaptive_coeff[t] and gamma[t] use only bars 0..t.
+        Rolling mean for gamma_spread uses backward window (center=False).
+        """
+        coeff = pd.Series(intermediates.adaptive_coeff, index=index)
+        coeff_roc = coeff - coeff.shift(1).fillna(coeff.iloc[0])
+
+        gamma = pd.Series(intermediates.gamma, index=index)
+        gamma_mean = gamma.rolling(
+            window=self.stats_window, min_periods=1
+        ).mean()
+        gamma_spread = gamma - gamma_mean
+
+        return pd.DataFrame(
+            {
+                "adaptive_coeff": coeff,
+                "adaptive_coeff_roc_1": coeff_roc,
+                "gamma_value": gamma,
+                "gamma_spread": gamma_spread,
+            }
+        )
+
+    def _extract_laguerre_stage_features(
+        self, index: pd.Index, intermediates: IntermediateValues
+    ) -> pd.DataFrame:
+        """
+        Extract 3 Laguerre stage differential features.
+
+        Non-anticipative: L0-L3 at bar t computed from close[t] and prior state.
+        laguerre_slope normalization includes current bar in rolling std
+        (same pattern as rsi_zscore_20).
+        """
+        L0 = intermediates.L0
+        L1 = intermediates.L1
+        L2 = intermediates.L2
+        L3 = intermediates.L3
+        eps = 1e-10
+
+        # Spread: normalized difference between first and last stage
+        spread = (L0 - L3) / (np.abs(L0) + np.abs(L3) + eps)
+
+        # Mid convergence: middle stage convergence relative to outer stages
+        outer_diff = np.abs(L0 - L1) + np.abs(L2 - L3) + eps
+        mid_convergence = np.abs(L1 - L2) / outer_diff
+
+        # Slope: L0 change normalized by rolling std for price-independence
+        L0_series = pd.Series(L0, index=index)
+        L0_diff = L0_series - L0_series.shift(1).fillna(L0_series.iloc[0])
+        L0_std = L0_diff.rolling(
+            window=self.stats_window, min_periods=1
+        ).std().fillna(0).replace(0, 1)
+        laguerre_slope = L0_diff / L0_std
+
+        return pd.DataFrame(
+            {
+                "laguerre_spread": spread,
+                "laguerre_mid_convergence": mid_convergence,
+                "laguerre_slope": laguerre_slope.values,
+            },
+            index=index,
+        )
+
+    def _extract_atr_range_features(
+        self, index: pd.Index, intermediates: IntermediateValues
+    ) -> pd.DataFrame:
+        """
+        Extract 1 ATR range width (vol-of-vol) feature.
+
+        Non-anticipative: min_atr[t] and max_atr[t] from ATR state at bar t.
+        """
+        eps = 1e-10
+        width = (intermediates.max_atr - intermediates.min_atr) / (
+            intermediates.max_atr + eps
+        )
+
+        return pd.DataFrame({"atr_range_width": width}, index=index)
+
+    def _extract_efficiency_features(
+        self, index: pd.Index, intermediates: IntermediateValues
+    ) -> pd.DataFrame:
+        """
+        Extract 2 Kaufman Efficiency Ratio features.
+
+        ER = |close[t] - close[t-n]| / sum(|close_changes|, window=n).
+        Non-anticipative: uses only close[t-n..t] (backward window).
+        """
+        close = pd.Series(intermediates.close, index=index)
+        n = self.stats_window
+
+        # Direction: net price movement over window
+        direction = np.abs(close - close.shift(n).fillna(close.iloc[0]))
+
+        # Volatility: sum of absolute 1-bar changes over window
+        abs_changes = np.abs(close - close.shift(1).fillna(close.iloc[0]))
+        volatility = abs_changes.rolling(window=n, min_periods=1).sum()
+
+        # ER = direction / volatility, clipped to [0, 1]
+        er = (direction / volatility.replace(0, 1)).clip(0, 1)
+        efficiency_trend = (er > 0.5).astype(np.int64)
+
+        return pd.DataFrame(
+            {
+                "efficiency_ratio": er.values,
+                "efficiency_trend": efficiency_trend.values,
+            },
+            index=index,
+        )
+
+    def _extract_cycle_features(
+        self, index: pd.Index, intermediates: IntermediateValues
+    ) -> pd.DataFrame:
+        """
+        Extract 2 Laguerre cycle phase detection features.
+
+        Phase encoding from L0-L3 stage relationships:
+        - 0 (down): L0 <= L1 and L2 <= L3
+        - 1 (turning_up): L0 > L1 and L2 <= L3
+        - 2 (up): L0 > L1 and L2 > L3
+        - 3 (turning_down): L0 <= L1 and L2 > L3
+
+        Non-anticipative: pointwise on current bar's filter stages.
+        """
+        L0_gt_L1 = intermediates.L0 > intermediates.L1
+        L2_gt_L3 = intermediates.L2 > intermediates.L3
+
+        phase = np.where(
+            ~L0_gt_L1 & ~L2_gt_L3, 0,
+            np.where(
+                L0_gt_L1 & ~L2_gt_L3, 1,
+                np.where(L0_gt_L1 & L2_gt_L3, 2, 3),
+            ),
+        )
+
+        phase_series = pd.Series(phase, index=index)
+        phase_changed = (
+            phase_series != phase_series.shift(1).fillna(phase_series.iloc[0])
+        ).astype(np.int64)
+
+        return pd.DataFrame(
+            {
+                "cycle_phase": phase,
+                "cycle_phase_changed": phase_changed.values,
+            },
+            index=index,
         )

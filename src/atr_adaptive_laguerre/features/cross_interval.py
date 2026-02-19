@@ -15,7 +15,6 @@ Error Handling: raise_and_propagate
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 class CrossIntervalFeatures:
@@ -43,9 +42,9 @@ class CrossIntervalFeatures:
         Extract 40 cross-interval interaction features.
 
         Args:
-            features_base: 31 features from base interval
-            features_mult1: 31 features from mult1 interval (aligned to base)
-            features_mult2: 31 features from mult2 interval (aligned to base)
+            features_base: 43 features from base interval
+            features_mult1: 43 features from mult1 interval (aligned to base)
+            features_mult2: 43 features from mult2 interval (aligned to base)
 
         Returns:
             DataFrame with 40 columns:
@@ -104,37 +103,37 @@ class CrossIntervalFeatures:
             - regime_majority: Majority vote regime (0, 1, or 2)
             - regime_unanimity: 1 if all intervals agree on regime
         """
-        regime_base = base["regime"]
-        regime_mult1 = mult1["regime"]
-        regime_mult2 = mult2["regime"]
+        regime_base = base["regime"].values
+        regime_mult1 = mult1["regime"].values
+        regime_mult2 = mult2["regime"].values
 
-        all_bullish = (
-            (regime_base == 2) & (regime_mult1 == 2) & (regime_mult2 == 2)
+        all_bullish = ((regime_base == 2) & (regime_mult1 == 2) & (regime_mult2 == 2)).astype(np.int64)
+        all_bearish = ((regime_base == 0) & (regime_mult1 == 0) & (regime_mult2 == 0)).astype(np.int64)
+        all_neutral = ((regime_base == 1) & (regime_mult1 == 1) & (regime_mult2 == 1)).astype(np.int64)
+
+        # Vectorized agreement count: max pairwise match count
+        # If all 3 same → 3; if any 2 same → 2; all different → 1
+        bm1 = (regime_base == regime_mult1).astype(np.int64)
+        bm2 = (regime_base == regime_mult2).astype(np.int64)
+        m1m2 = (regime_mult1 == regime_mult2).astype(np.int64)
+        all_same = bm1 & bm2  # implies m1m2 too
+        any_pair = bm1 | bm2 | m1m2
+        agreement_count = np.where(all_same, 3, np.where(any_pair, 2, 1)).astype(np.int64)
+
+        # Vectorized majority regime (mode with min tie-break)
+        # With 3 values: if any pair matches, that's the majority; if all different, min wins
+        regime_majority = np.where(
+            bm1, regime_base,  # base == mult1 → they're the majority
+            np.where(
+                bm2, regime_base,  # base == mult2 → they're the majority
+                np.where(
+                    m1m2, regime_mult1,  # mult1 == mult2 → they're the majority
+                    np.minimum(np.minimum(regime_base, regime_mult1), regime_mult2)  # all different → min (scipy.stats.mode tie-break)
+                )
+            )
         ).astype(np.int64)
 
-        all_bearish = (
-            (regime_base == 0) & (regime_mult1 == 0) & (regime_mult2 == 0)
-        ).astype(np.int64)
-
-        all_neutral = (
-            (regime_base == 1) & (regime_mult1 == 1) & (regime_mult2 == 1)
-        ).astype(np.int64)
-
-        # Agreement count (how many intervals share the same regime)
-        agreement_count = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(len(base)):
-            regimes = [regime_base.iloc[i], regime_mult1.iloc[i], regime_mult2.iloc[i]]
-            max_count = max(regimes.count(r) for r in set(regimes))
-            agreement_count.iloc[i] = max_count
-
-        # Majority regime (mode of 3 regimes)
-        regime_majority = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(len(base)):
-            regimes = [regime_base.iloc[i], regime_mult1.iloc[i], regime_mult2.iloc[i]]
-            regime_majority.iloc[i] = stats.mode(regimes, keepdims=False)[0]
-
-        # Unanimity (all 3 agree)
-        unanimity = (agreement_count == 3).astype(np.int64)
+        unanimity = all_same.astype(np.int64)
 
         return pd.DataFrame(
             {
@@ -144,7 +143,8 @@ class CrossIntervalFeatures:
                 "regime_agreement_count": agreement_count,
                 "regime_majority": regime_majority,
                 "regime_unanimity": unanimity,
-            }
+            },
+            index=base.index,
         )
 
     def _regime_divergence(
@@ -164,12 +164,12 @@ class CrossIntervalFeatures:
             - gradient_up: RSI increasing with interval (base > mult1 > mult2)
             - gradient_down: RSI decreasing with interval
         """
-        regime_base = base["regime"]
-        regime_mult1 = mult1["regime"]
-        regime_mult2 = mult2["regime"]
-        rsi_base = base["rsi"]
-        rsi_mult1 = mult1["rsi"]
-        rsi_mult2 = mult2["rsi"]
+        regime_base = base["regime"].values
+        regime_mult1 = mult1["regime"].values
+        regime_mult2 = mult2["regime"].values
+        rsi_base = base["rsi"].values
+        rsi_mult1 = mult1["rsi"].values
+        rsi_mult2 = mult2["rsi"].values
 
         base_bull_higher_bear = (
             (regime_base == 2) & ((regime_mult1 == 0) | (regime_mult2 == 0))
@@ -179,25 +179,20 @@ class CrossIntervalFeatures:
             (regime_base == 0) & ((regime_mult1 == 2) | (regime_mult2 == 2))
         ).astype(np.int64)
 
-        # Divergence strength (RSI spread)
-        divergence_strength = pd.DataFrame(
-            {"base": rsi_base, "mult1": rsi_mult1, "mult2": rsi_mult2}
-        ).apply(lambda row: row.max() - row.min(), axis=1)
+        # Vectorized divergence strength (replaces apply(lambda))
+        rsi_stack = np.column_stack([rsi_base, rsi_mult1, rsi_mult2])
+        divergence_strength = rsi_stack.max(axis=1) - rsi_stack.min(axis=1)
 
-        # Divergence direction
         divergence_direction = np.sign(rsi_base - rsi_mult2).astype(np.int64)
 
-        # Base extreme, higher neutral
         base_extreme_higher_neutral = (
-            (regime_base.isin([0, 2])) & (regime_mult2 == 1)
+            ((regime_base == 0) | (regime_base == 2)) & (regime_mult2 == 1)
         ).astype(np.int64)
 
-        # Base neutral, higher extreme
         base_neutral_higher_extreme = (
-            (regime_base == 1) & (regime_mult2.isin([0, 2]))
+            (regime_base == 1) & ((regime_mult2 == 0) | (regime_mult2 == 2))
         ).astype(np.int64)
 
-        # Gradient patterns
         gradient_up = ((rsi_base > rsi_mult1) & (rsi_mult1 > rsi_mult2)).astype(np.int64)
         gradient_down = ((rsi_base < rsi_mult1) & (rsi_mult1 < rsi_mult2)).astype(np.int64)
 
@@ -211,7 +206,8 @@ class CrossIntervalFeatures:
                 "base_neutral_higher_extreme": base_neutral_higher_extreme,
                 "gradient_up": gradient_up,
                 "gradient_down": gradient_down,
-            }
+            },
+            index=base.index,
         )
 
     def _momentum_patterns(
@@ -303,32 +299,24 @@ class CrossIntervalFeatures:
             (cross_os_base == 1) & (regime_mult2.isin([0, 2]))
         ).astype(np.int64)
 
-        # Cascade crossings (sequential within 3 bars)
-        cascade_up = pd.Series(0, index=base.index, dtype=np.int64)
-        cascade_down = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(2, len(base)):
-            # Check if mult2, mult1, base crossed up sequentially
-            if (
-                cross_os_mult2.iloc[i - 2] == 1
-                and cross_os_mult1.iloc[i - 1] == 1
-                and cross_os_base.iloc[i] == 1
-            ):
-                cascade_up.iloc[i] = 1
+        # Vectorized cascade crossings: shift(2) + shift(1) + current
+        cascade_up = (
+            (cross_os_mult2.shift(2) == 1)
+            & (cross_os_mult1.shift(1) == 1)
+            & (cross_os_base == 1)
+        ).astype(np.int64).fillna(0).astype(np.int64)
 
-            # Check if mult2, mult1, base crossed down sequentially
-            if (
-                cross_ob_mult2.iloc[i - 2] == 1
-                and cross_ob_mult1.iloc[i - 1] == 1
-                and cross_ob_base.iloc[i] == 1
-            ):
-                cascade_down.iloc[i] = 1
+        cascade_down = (
+            (cross_ob_mult2.shift(2) == 1)
+            & (cross_ob_mult1.shift(1) == 1)
+            & (cross_ob_base == 1)
+        ).astype(np.int64).fillna(0).astype(np.int64)
 
-        # Higher crossed first (mult2 crossed within last 10 bars, base crosses now)
-        higher_crossed_first = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(10, len(base)):
-            if cross_os_base.iloc[i] == 1:
-                if cross_os_mult2.iloc[i - 10 : i].sum() > 0:
-                    higher_crossed_first.iloc[i] = 1
+        # Vectorized higher_crossed_first: rolling(10).sum() on mult2, then AND with base crossing
+        mult2_crossed_recent = cross_os_mult2.rolling(10, min_periods=1).sum().shift(1).fillna(0)
+        higher_crossed_first = (
+            (cross_os_base == 1) & (mult2_crossed_recent > 0)
+        ).astype(np.int64)
 
         return pd.DataFrame(
             {
@@ -382,57 +370,48 @@ class CrossIntervalFeatures:
         # Persistence ratio (avoid division by zero)
         persistence_ratio = bars_in_regime_base / bars_in_regime_mult2.replace(0, 1)
 
-        # Regime change cascade (mult2 changed within last 5 bars before base changed)
-        change_cascade = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(5, len(base)):
-            if regime_changed_base.iloc[i] == 1:
-                if regime_changed_mult2.iloc[i - 5 : i].sum() > 0:
-                    change_cascade.iloc[i] = 1
+        # Vectorized regime change cascade: rolling(5).sum() on mult2, then AND with base changed
+        mult2_changed_recent = regime_changed_mult2.rolling(5, min_periods=1).sum().shift(1).fillna(0)
+        change_cascade = (
+            (regime_changed_base == 1) & (mult2_changed_recent > 0)
+        ).astype(np.int64)
 
         # Stability score
         stability_score = 1 - (
             regime_changed_base + regime_changed_mult1 + regime_changed_mult2
         ) / 3
 
-        # Bars since alignment
+        # Vectorized bars_since_alignment and alignment_duration using cumsum group trick
         unanimity = (regime_base == regime_mult1) & (regime_mult1 == regime_mult2)
-        bars_since_alignment = pd.Series(0, index=base.index, dtype=np.int64)
-        counter = 0
-        for i in range(len(base)):
-            if unanimity.iloc[i]:
-                counter = 0
-            else:
-                counter += 1
-            bars_since_alignment.iloc[i] = counter
 
-        # Alignment duration
-        alignment_duration = pd.Series(0, index=base.index, dtype=np.int64)
-        counter = 0
-        for i in range(len(base)):
-            if unanimity.iloc[i]:
-                counter += 1
-            else:
-                counter = 0
-            alignment_duration.iloc[i] = counter
+        # bars_since_alignment: count consecutive non-unanimity bars (reset on unanimity)
+        not_unanimous = (~unanimity).astype(np.int64)
+        # Group trick: cumsum of unanimity creates group IDs, within each group cumsum of not_unanimous gives the counter
+        unanimity_groups = unanimity.cumsum()
+        bars_since_alignment = not_unanimous.groupby(unanimity_groups).cumsum().astype(np.int64)
 
-        # Higher leading base (mult2 changed 1-5 bars before base)
-        higher_leading = pd.Series(0, index=base.index, dtype=np.int64)
-        for i in range(5, len(base)):
-            if regime_changed_base.iloc[i] == 1:
-                if regime_changed_mult2.iloc[i - 5 : i].sum() > 0:
-                    higher_leading.iloc[i] = 1
+        # alignment_duration: count consecutive unanimity bars (reset on non-unanimity)
+        unanimous_int = unanimity.astype(np.int64)
+        not_unanimous_groups = not_unanimous.cumsum()
+        alignment_duration = unanimous_int.groupby(not_unanimous_groups).cumsum().astype(np.int64)
+
+        # Vectorized higher_leading: same pattern as change_cascade
+        higher_leading = (
+            (regime_changed_base == 1) & (mult2_changed_recent > 0)
+        ).astype(np.int64)
 
         # Transition pattern (3-bit: base, mult1, mult2)
         transition_pattern = (
             regime_changed_base * 4 + regime_changed_mult1 * 2 + regime_changed_mult2
         ).astype(np.int64)
 
-        # RSI statistics across intervals
-        rsi_df = pd.DataFrame({"base": rsi_base, "mult1": rsi_mult1, "mult2": rsi_mult2})
-        mean_rsi = rsi_df.mean(axis=1)
-        std_rsi = rsi_df.std(axis=1)
-        range_rsi = rsi_df.max(axis=1) - rsi_df.min(axis=1)
-        skew_rsi = (rsi_base - mean_rsi) / std_rsi.replace(0, 1)
+        # RSI statistics across intervals (vectorized with numpy)
+        rsi_stack = np.column_stack([rsi_base.values, rsi_mult1.values, rsi_mult2.values])
+        mean_rsi = rsi_stack.mean(axis=1)
+        std_rsi = rsi_stack.std(axis=1, ddof=1)  # ddof=1 matches pandas default
+        range_rsi = rsi_stack.max(axis=1) - rsi_stack.min(axis=1)
+        std_rsi_safe = np.where(std_rsi == 0, 1, std_rsi)
+        skew_rsi = (rsi_base.values - mean_rsi) / std_rsi_safe
 
         # Momentum agreement
         momentum_agreement = (
@@ -455,5 +434,6 @@ class CrossIntervalFeatures:
                 "rsi_range_across_intervals": range_rsi,
                 "rsi_skew_across_intervals": skew_rsi,
                 "interval_momentum_agreement": momentum_agreement,
-            }
+            },
+            index=base.index,
         )

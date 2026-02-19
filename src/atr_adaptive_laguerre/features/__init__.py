@@ -7,6 +7,7 @@ from atr_adaptive_laguerre.features.atr_adaptive_rsi import (
 from atr_adaptive_laguerre.features.base import BaseFeature, FeatureConfig
 from atr_adaptive_laguerre.features.cross_interval import CrossIntervalFeatures
 from atr_adaptive_laguerre.features.feature_expander import FeatureExpander
+from atr_adaptive_laguerre.features.intermediates import IntermediateValues
 from atr_adaptive_laguerre.features.multi_interval import MultiIntervalProcessor
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "ATRAdaptiveLaguerreRSI",
     "ATRAdaptiveLaguerreRSIConfig",
     "FeatureExpander",
+    "IntermediateValues",
     "MultiIntervalProcessor",
     "CrossIntervalFeatures",
 ]

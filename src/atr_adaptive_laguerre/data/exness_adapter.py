@@ -36,7 +36,7 @@ class ExnessPhase7Adapter:
     Adapter to extract session features from exness-data-preprocess Phase7 schema.
 
     Current implementation: Tier 2 only (3 global session flags)
-    Target: 85 + 3 = 88 total features
+    Target: 121 + 3 = 124 total features
 
     Design rationale:
     - Session flags are pre-computed binary features (0/1)
@@ -53,7 +53,7 @@ class ExnessPhase7Adapter:
         >>> processor = ExnessDataProcessor()
         >>> ohlc_df = processor.query_ohlc("EURUSD", "5m", "2024-01-01")
         >>>
-        >>> # Extract RSI features (85 features after redundancy filter)
+        >>> # Extract RSI features (121 features after redundancy filter)
         >>> rsi_indicator = ATRAdaptiveLaguerreRSI(...)
         >>> rsi_features = rsi_indicator.fit_transform_features(ohlc_df)
         >>>
@@ -135,40 +135,40 @@ class ExnessPhase7Adapter:
         cls, rsi_features: pd.DataFrame, phase7_df: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Combine ATR-Laguerre RSI features (85) with session features (3).
+        Combine ATR-Laguerre RSI features (121) with session features (3).
 
         Args:
-            rsi_features: 85-column DataFrame from ATRAdaptiveLaguerreRSI.fit_transform_features()
+            rsi_features: 121-column DataFrame from ATRAdaptiveLaguerreRSI.fit_transform_features()
                           (after redundancy filtering)
             phase7_df: DataFrame with Phase7 30-column schema
 
         Returns:
-            Combined 88-column DataFrame:
-            - Columns 0-84: RSI features (85 total)
-            - Columns 85-87: Session features (3 total)
+            Combined 124-column DataFrame:
+            - Columns 0-120: RSI features (121 total)
+            - Columns 121-123: Session features (3 total)
 
         Raises:
             ValueError: If indices don't match
-            ValueError: If rsi_features doesn't have 85 columns
+            ValueError: If rsi_features doesn't have 121 columns
             ValueError: If Phase7 columns missing
 
         Example:
             >>> rsi_features = indicator.fit_transform_features(ohlc_df)
-            >>> rsi_features.shape  # (n_bars, 85)
+            >>> rsi_features.shape  # (n_bars, 121)
             >>>
             >>> combined = ExnessPhase7Adapter.combine_with_rsi_features(
             ...     rsi_features, ohlc_df
             ... )
-            >>> combined.shape  # (n_bars, 88)
+            >>> combined.shape  # (n_bars, 124)
         """
         # Validate RSI features
         if not isinstance(rsi_features, pd.DataFrame):
             raise TypeError(f"rsi_features must be pd.DataFrame, got {type(rsi_features)}")
 
-        # Validate feature count (should be 85 after redundancy filter)
-        if len(rsi_features.columns) != 85:
+        # Validate feature count (should be 121 after redundancy filter)
+        if len(rsi_features.columns) != 121:
             raise ValueError(
-                f"rsi_features should have 85 columns (after redundancy filtering), "
+                f"rsi_features should have 121 columns (after redundancy filtering), "
                 f"got {len(rsi_features.columns)}. "
                 f"Ensure you're using ATRAdaptiveLaguerreRSI.fit_transform_features() "
                 f"with apply_redundancy_filter=True (default)."
@@ -192,8 +192,8 @@ class ExnessPhase7Adapter:
         combined_df = pd.concat([rsi_features, session_features], axis=1)
 
         # Validate result
-        assert len(combined_df.columns) == 88, (
-            f"Expected 88 columns (85 RSI + 3 session), got {len(combined_df.columns)}"
+        assert len(combined_df.columns) == 124, (
+            f"Expected 124 columns (121 RSI + 3 session), got {len(combined_df.columns)}"
         )
 
         return combined_df
