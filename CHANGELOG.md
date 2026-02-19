@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.3.1...v2.4.0) (2026-02-19)
+
+
+### Features
+
+* add LaguerreFeatureProvider plugin for rangebar-py integration ([0c480a3](https://github.com/terrylica/atr-adaptive-laguerre/commit/0c480a3d4653f500817c76d1bf84c02fd0b43e90)), closes [#1](https://github.com/terrylica/atr-adaptive-laguerre/issues/1)
+
 ## [2.3.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.3.0...v2.3.1) (2026-02-19)
 
 
