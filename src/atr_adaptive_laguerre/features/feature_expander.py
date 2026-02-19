@@ -192,9 +192,14 @@ class FeatureExpander:
         )
 
         # Regime strength (how deep into extreme zone)
-        regime_strength = pd.Series(0.0, index=rsi.index)
-        regime_strength[regime == 0] = np.maximum(self.level_down - rsi[regime == 0], 0)
-        regime_strength[regime == 2] = np.maximum(rsi[regime == 2] - self.level_up, 0)
+        regime_strength = pd.Series(
+            np.where(
+                regime == 0,
+                np.maximum(self.level_down - rsi.values, 0),
+                np.where(regime == 2, np.maximum(rsi.values - self.level_up, 0), 0.0),
+            ),
+            index=rsi.index,
+        )
 
         return pd.DataFrame(
             {
@@ -282,25 +287,15 @@ class FeatureExpander:
         is_oversold = rsi < self.level_down
         is_overbought = rsi > self.level_up
 
-        # Bars since last oversold event
-        bars_since_oversold = pd.Series(0, index=rsi.index, dtype=np.int64)
-        counter = 0
-        for i in range(len(rsi)):
-            if is_oversold.iloc[i]:
-                counter = 0
-            else:
-                counter += 1
-            bars_since_oversold.iloc[i] = counter
+        # Bars since last oversold event (vectorized cumsum group trick)
+        not_oversold = (~is_oversold).astype(np.int64)
+        oversold_groups = is_oversold.cumsum()
+        bars_since_oversold = not_oversold.groupby(oversold_groups).cumsum().astype(np.int64)
 
-        # Bars since last overbought event
-        bars_since_overbought = pd.Series(0, index=rsi.index, dtype=np.int64)
-        counter = 0
-        for i in range(len(rsi)):
-            if is_overbought.iloc[i]:
-                counter = 0
-            else:
-                counter += 1
-            bars_since_overbought.iloc[i] = counter
+        # Bars since last overbought event (same pattern)
+        not_overbought = (~is_overbought).astype(np.int64)
+        overbought_groups = is_overbought.cumsum()
+        bars_since_overbought = not_overbought.groupby(overbought_groups).cumsum().astype(np.int64)
 
         # Min of both
         bars_since_extreme = np.minimum(bars_since_oversold, bars_since_overbought)
@@ -355,15 +350,16 @@ class FeatureExpander:
         # Rolling statistics
         rolling = rsi.rolling(window=self.stats_window, min_periods=1)
 
-        rsi_mean = rolling.mean()
-        rsi_std = rolling.std().fillna(0)  # First bar has std=0
-        rsi_min = rolling.min()
-        rsi_max = rolling.max()
+        stats_df = rolling.agg(["mean", "std", "min", "max"])
+        rsi_mean = stats_df["mean"]
+        rsi_std = stats_df["std"].fillna(0)  # First bar has std=0
+        rsi_min = stats_df["min"]
+        rsi_max = stats_df["max"]
 
         # Percentile rank (current value's position in rolling window)
         rsi_percentile_20 = (
             rsi.rolling(window=self.stats_window, min_periods=1)
-            .apply(lambda x: (x.iloc[-1] > x.iloc[:-1]).sum() / len(x) * 100, raw=False)
+            .apply(lambda x: (x[-1] > x[:-1]).sum() / len(x) * 100, raw=True)
             .fillna(50.0)  # First bar: median rank
         )
 

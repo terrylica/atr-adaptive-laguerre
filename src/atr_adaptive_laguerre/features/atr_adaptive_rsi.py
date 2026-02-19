@@ -477,7 +477,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
             min_atr=min_atr_arr,
             max_atr=max_atr_arr,
             atr=atr_arr,
-            close=close.copy(),
+            close=close,
         )
 
         return rsi_values, intermediates
@@ -916,16 +916,25 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         features_mult1_cols.columns = features_mult1_cols.columns.str.replace("_mult1", "")
         features_mult2_cols.columns = features_mult2_cols.columns.str.replace("_mult2", "")
 
+        # Early drop: remove per-interval redundant features before concat
+        if self.config.filter_redundancy:
+            from .redundancy_filter import RedundancyFilter
+            per_interval_redundant = [
+                f for f in RedundancyFilter.REDUNDANT_FEATURES
+                if f in features_all_intervals.columns
+            ]
+            if per_interval_redundant:
+                features_all_intervals = features_all_intervals.drop(columns=per_interval_redundant)
+
         interactions = cross_interval.extract_interactions(
             features_base_cols, features_mult1_cols, features_mult2_cols
         )
 
-        # Combine all features: 129 interval features + 40 interactions = 169
+        # Combine all features
         features_final = pd.concat([features_all_intervals, interactions], axis=1)
 
-        # Apply redundancy filtering if enabled (169 → 121)
+        # Drop remaining cross-interval redundant features
         if self.config.filter_redundancy:
-            from .redundancy_filter import RedundancyFilter
             features_final = RedundancyFilter.filter(features_final, apply_filter=True)
 
         return features_final
@@ -1087,16 +1096,25 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         features_mult1_cols.columns = features_mult1_cols.columns.str.replace("_mult1", "")
         features_mult2_cols.columns = features_mult2_cols.columns.str.replace("_mult2", "")
 
+        # Early drop: remove per-interval redundant features before concat
+        if self.config.filter_redundancy:
+            from .redundancy_filter import RedundancyFilter
+            per_interval_redundant = [
+                f for f in RedundancyFilter.REDUNDANT_FEATURES
+                if f in result.columns
+            ]
+            if per_interval_redundant:
+                result = result.drop(columns=per_interval_redundant)
+
         interactions = cross_interval.extract_interactions(
             features_base_cols, features_mult1_cols, features_mult2_cols
         )
 
-        # Combine all features: 81 interval features + 40 interactions = 121
+        # Combine all features
         features_final = pd.concat([result, interactions], axis=1)
 
-        # Apply redundancy filtering if enabled (121 → 79)
+        # Drop remaining cross-interval redundant features
         if self.config.filter_redundancy:
-            from .redundancy_filter import RedundancyFilter
             features_final = RedundancyFilter.filter(features_final, apply_filter=True)
 
         return features_final

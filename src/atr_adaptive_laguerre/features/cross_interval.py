@@ -179,9 +179,11 @@ class CrossIntervalFeatures:
             (regime_base == 0) & ((regime_mult1 == 2) | (regime_mult2 == 2))
         ).astype(np.int64)
 
-        # Vectorized divergence strength (replaces apply(lambda))
-        rsi_stack = np.column_stack([rsi_base, rsi_mult1, rsi_mult2])
-        divergence_strength = rsi_stack.max(axis=1) - rsi_stack.min(axis=1)
+        # Vectorized divergence strength (zero temporary allocation)
+        divergence_strength = (
+            np.maximum(np.maximum(rsi_base, rsi_mult1), rsi_mult2)
+            - np.minimum(np.minimum(rsi_base, rsi_mult1), rsi_mult2)
+        )
 
         divergence_direction = np.sign(rsi_base - rsi_mult2).astype(np.int64)
 
