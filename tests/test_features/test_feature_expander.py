@@ -651,3 +651,56 @@ class TestFullFeaturePipeline:
 
         # Compare all columns
         pd.testing.assert_frame_equal(features_1, features_2)
+
+
+class TestBarsInRegimeFix:
+    """Tests for Issue #2: bars_in_regime consecutive count fix."""
+
+    def test_bars_in_regime_consecutive_count(self) -> None:
+        """bars_in_regime must produce sequential counts that reset on regime change."""
+        regime = pd.Series([1, 1, 1, 2, 2, 2, 2, 0, 0, 1, 1, 2, 2, 2])
+        expected = [1, 2, 3, 1, 2, 3, 4, 1, 2, 1, 2, 1, 2, 3]
+
+        g = (regime != regime.shift(1)).cumsum()
+        bars_in_regime = g.groupby(g).cumcount() + 1
+
+        assert bars_in_regime.tolist() == expected
+
+    def test_bars_in_regime_reaches_long_runs(self, sample_ohlcv: pd.DataFrame) -> None:
+        """bars_in_regime must reach values > 1 in a real feature pipeline."""
+        config = ATRAdaptiveLaguerreRSIConfig(atr_period=14, smoothing_period=5)
+        feature = ATRAdaptiveLaguerreRSI(config)
+        features = feature.fit_transform_features(sample_ohlcv)
+        assert features["bars_in_regime"].max() > 1, (
+            f"bars_in_regime max={features['bars_in_regime'].max()}, expected > 1"
+        )
+
+    def test_tail_risk_extreme_regime_persistence_fires(self) -> None:
+        """extreme_regime_persistence must fire when bars_in_regime > 10 in extreme regime."""
+        np.random.seed(123)
+        n = 200
+        # Create prices that produce a sustained bullish regime (RSI near 1.0)
+        close = 100.0 + np.arange(n) * 0.8 + np.random.randn(n) * 0.05
+        high = close + 0.1
+        low = close - 0.1
+        open_ = close - 0.05
+        volume = np.full(n, 1000.0)
+        ohlcv = pd.DataFrame({
+            "date": pd.date_range("2024-01-01", periods=n, freq="2h"),
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        })
+        config = ATRAdaptiveLaguerreRSIConfig(atr_period=14, smoothing_period=5)
+        feature = ATRAdaptiveLaguerreRSI(config)
+        features = feature.fit_transform_features(ohlcv)
+
+        assert features["bars_in_regime"].max() > 10, (
+            f"bars_in_regime max={features['bars_in_regime'].max()}, need > 10 for persistence"
+        )
+        assert features["tail_risk_score"].max() >= 0.3, (
+            f"tail_risk_score max={features['tail_risk_score'].max()}, "
+            f"expected >= 0.3 (extreme_regime_persistence * 0.3 weight must activate)"
+        )

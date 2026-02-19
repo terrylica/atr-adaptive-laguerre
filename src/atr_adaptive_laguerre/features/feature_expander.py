@@ -186,10 +186,10 @@ class FeatureExpander:
             np.int64
         )
 
-        # Bars in current regime (cumulative count, resets on regime change)
-        bars_in_regime = (
-            regime_changed.groupby((regime_changed == 1).cumsum()).cumsum()
-        )
+        # Bars in current regime (consecutive count, resets on regime change)
+        # Issue #2: was cumsum of regime_changed (always 0 or 1), now cumcount per group
+        g = (regime != regime.shift(1)).cumsum()
+        bars_in_regime = g.groupby(g).cumcount() + 1
 
         # Regime strength (how deep into extreme zone)
         regime_strength = pd.Series(
