@@ -49,6 +49,9 @@ dev = [
 Repository = "https://github.com/terrylica/atr-adaptive-laguerre"
 Documentation = "https://github.com/terrylica/atr-adaptive-laguerre/blob/main/docs/README.md"
 
+[project.entry-points."rangebar.feature_providers"]
+laguerre = "atr_adaptive_laguerre.rangebar_plugin:LaguerreFeatureProvider"
+
 [tool.hatchling.build.targets.wheel]
 packages = ["src/atr_adaptive_laguerre"]
 
