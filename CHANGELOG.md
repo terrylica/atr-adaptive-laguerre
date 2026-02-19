@@ -1,3 +1,15 @@
+# [2.3.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.2.0...v2.3.0) (2026-02-19)
+
+
+### Bug Fixes
+
+* remove redundant git push from semantic-release successCmd ([935d174](https://github.com/terrylica/atr-adaptive-laguerre/commit/935d174a4eb88866f1efbc51ec792460d20be369))
+
+
+### Features
+
+* add 12 intermediate features, optimize ATR and cross-interval ([45328f7](https://github.com/terrylica/atr-adaptive-laguerre/commit/45328f7d8ca0d6b1c47fa1ceb426378daa6a2731))
+
 # [2.2.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.1.0...v2.2.0) (2026-02-18)
 
 
