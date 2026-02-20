@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Phase 4 of 4: Post-release verification. Checks: git tag exists, GitHub release published, PyPI package available, local build artifacts."
+#MISE description="Phase 4 of 4: Post-release verification. Checks: git tag, GitHub release, PyPI availability, local build artifacts."
 set -euo pipefail
 
 echo "═══════════════════════════════════════════════════════════"
@@ -16,7 +16,7 @@ else
     echo "  ✗ Tag v$VERSION not found"
 fi
 
-# Check 2: GitHub release exists (using curl to avoid gh CLI process storm risks)
+# Check 2: GitHub release exists
 echo "→ Checking GitHub release..."
 RELEASE_URL="https://api.github.com/repos/terrylica/atr-adaptive-laguerre/releases/tags/v$VERSION"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${GH_TOKEN:-}" "$RELEASE_URL" 2>/dev/null || echo "000")
@@ -34,8 +34,8 @@ PYPI_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/atr-
 if [[ "$PYPI_STATUS" == "200" ]]; then
     echo "  ✓ PyPI atr-adaptive-laguerre==$VERSION available"
 elif [[ "$PYPI_STATUS" == "404" ]]; then
-    echo "  ⚠ Not on PyPI yet (GitHub Actions may still be running)"
-    echo "    Check: https://github.com/terrylica/atr-adaptive-laguerre/actions"
+    echo "  ⚠ Not yet on PyPI — CDN may still be propagating (check in ~2 min)"
+    echo "    https://pypi.org/project/atr-adaptive-laguerre/$VERSION/"
 else
     echo "  ⚠ Could not verify PyPI (HTTP $PYPI_STATUS)"
 fi

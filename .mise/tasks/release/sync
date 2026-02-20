@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Phase 3 of 4: Build wheel+sdist and push tag to trigger GitHub Actions publish to PyPI and CodeArtifact."
+#MISE description="Phase 3 of 4: Build wheel+sdist locally and push git tag + main to GitHub. PyPI publish is handled separately by release:pypi."
 set -euo pipefail
 
 echo "═══════════════════════════════════════════════════════════"
@@ -17,7 +17,7 @@ echo "  ✓ Built wheel + sdist in dist/"
 
 # Step 2: Verify the built package
 echo "→ Verifying package..."
-WHEEL=$(ls dist/*.whl 2>/dev/null | head -1)
+WHEEL=$(find dist -name "*.whl" 2>/dev/null | head -1)
 if [[ -n "$WHEEL" ]]; then
     echo "  ✓ Wheel: $(basename "$WHEEL")"
 else
@@ -25,19 +25,17 @@ else
     exit 1
 fi
 
-# Step 3: Push tag (triggers GitHub Actions for PyPI + CodeArtifact)
-echo "→ Pushing tag v$VERSION..."
+# Step 3: Push tag and main branch (creates GitHub release via semantic-release's @semantic-release/github)
+echo "→ Pushing tag v$VERSION and main..."
 if git rev-parse "v$VERSION" &>/dev/null; then
     git push origin "v$VERSION" 2>/dev/null || echo "  ⚠ Tag already pushed"
     git push origin main 2>/dev/null || echo "  ⚠ main already up to date"
-    echo "  ✓ Tag v$VERSION pushed (GitHub Actions will publish)"
+    echo "  ✓ Tag v$VERSION pushed"
 else
     echo "  ⚠ Tag v$VERSION not found — run release:version first"
     exit 1
 fi
 
 echo ""
-echo "✓ Sync phase complete"
-echo "  PyPI: https://pypi.org/project/atr-adaptive-laguerre/$VERSION/"
-echo "  CodeArtifact: eonlabs/el-prediction-pipeline"
+echo "✓ Sync phase complete (PyPI publish next via release:pypi)"
 echo ""

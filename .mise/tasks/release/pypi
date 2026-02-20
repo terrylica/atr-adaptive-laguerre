@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="Phase 3b: Publish built wheel + sdist to PyPI via uv publish + 1Password token. No GitHub Actions required."
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════"
+echo "  Phase 3b: PYPI PUBLISH (local, no GitHub Actions)"
+echo "═══════════════════════════════════════════════════════════"
+
+chmod +x scripts/publish-to-pypi.sh
+bash scripts/publish-to-pypi.sh
+
+echo ""
+echo "✓ PyPI publish phase complete"
+echo ""

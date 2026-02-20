@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Execute complete 4-phase release pipeline: preflight → semantic-release version → build + push → verify. Primary entry point for releasing atr-adaptive-laguerre."
+#MISE description="Execute complete 5-phase release pipeline: preflight → version → build+push → pypi publish → verify. All local, no GitHub Actions."
 set -euo pipefail
 
 echo ""
@@ -11,11 +11,14 @@ echo ""
 # Phase 1: Preflight
 mise run release:preflight
 
-# Phase 2: Version
+# Phase 2: Version (semantic-release: bump pyproject.toml, CHANGELOG, git tag, GitHub release)
 mise run release:version
 
-# Phase 3: Sync (build + push)
+# Phase 3: Sync (uv build + push tag + push main)
 mise run release:sync
+
+# Phase 3b: PyPI Publish (uv publish via 1Password token — no GitHub Actions)
+mise run release:pypi
 
 # Phase 4: Verify
 mise run release:verify
