@@ -14,9 +14,12 @@
 set -euo pipefail
 
 # ---- 1Password configuration ------------------------------------------------
-# "PyPI Token - terrylica-pypi-entire-account-token" in Claude Automation vault
-OP_PYPI_ITEM="${OP_PYPI_ITEM:-zdc7ap2ixpqgtpq62xm2davi7e}"
-OP_PYPI_VAULT="${OP_PYPI_VAULT:-Claude Automation}"
+# "PyPI Token - terrylica-pypi-entire-account-token"
+# Vault: Claude Automation (ggk4orq7rmcm7jinsb4ahygv7e) @ eonlabs.1password.com
+# NOTE: Uses project-specific var name ATR_OP_PYPI_ITEM (not OP_PYPI_ITEM which
+#       may be inherited from rangebar-py's mise env with a different item ID).
+ATR_OP_PYPI_ITEM="${ATR_OP_PYPI_ITEM:-zdc7ap2ixpqgtpq62xm2davi7e}"
+ATR_OP_PYPI_VAULT="${ATR_OP_PYPI_VAULT:-ggk4orq7rmcm7jinsb4ahygv7e}"
 PYPI_VERIFY_DELAY="${PYPI_VERIFY_DELAY:-5}"
 
 # ---- Tool discovery ---------------------------------------------------------
@@ -66,21 +69,18 @@ SDIST=$(find dist -name "*${VERSION}*.tar.gz" 2>/dev/null | head -1 || true)
 echo ""
 
 # ---- Fetch PyPI token from 1Password ----------------------------------------
-echo "→ Fetching PyPI token from 1Password (vault: $OP_PYPI_VAULT)..."
+echo "→ Fetching PyPI token from 1Password (vault: $ATR_OP_PYPI_VAULT)..."
 
 # Use service account token if available (headless), otherwise biometric
-if [[ -f "$HOME/.claude/.secrets/op-service-account-token" ]]; then
-    PYPI_TOKEN=$(OP_SERVICE_ACCOUNT_TOKEN="$(cat "$HOME/.claude/.secrets/op-service-account-token")" \
-        $OP_CMD item get "$OP_PYPI_ITEM" \
-            --vault "$OP_PYPI_VAULT" \
-            --fields "credential" \
-            --reveal 2>/dev/null)
-else
-    PYPI_TOKEN=$($OP_CMD item get "$OP_PYPI_ITEM" \
-        --vault "$OP_PYPI_VAULT" \
-        --fields "credential" \
-        --reveal 2>/dev/null)
+_OP_SA_TOKEN_FILE="$HOME/.claude/.secrets/op-service-account-token"
+if [[ -f "$_OP_SA_TOKEN_FILE" ]]; then
+    export OP_SERVICE_ACCOUNT_TOKEN
+    OP_SERVICE_ACCOUNT_TOKEN="$(cat "$_OP_SA_TOKEN_FILE")"
 fi
+PYPI_TOKEN=$($OP_CMD item get "$ATR_OP_PYPI_ITEM" \
+    --vault "$ATR_OP_PYPI_VAULT" \
+    --fields "credential" \
+    --reveal)
 
 if [[ -z "$PYPI_TOKEN" ]]; then
     echo "✗ Failed to retrieve PyPI token from 1Password"
@@ -91,9 +91,11 @@ echo ""
 
 # ---- Publish ----------------------------------------------------------------
 echo "→ Publishing to PyPI..."
-# Build file list via find (SC2012: avoid ls for glob matching)
-mapfile -t DIST_FILES < <(find dist -name "*${VERSION}*.whl" -o -name "*${VERSION}*.tar.gz" 2>/dev/null)
-UV_PUBLISH_TOKEN="$PYPI_TOKEN" $UV_CMD publish "${DIST_FILES[@]}"
+# Collect dist files via find into positional params (SC2012: avoid ls; mapfile not in bash 3.2)
+while IFS= read -r f; do set -- "$@" "$f"; done < <(
+    find dist \( -name "*${VERSION}*.whl" -o -name "*${VERSION}*.tar.gz" \) 2>/dev/null
+)
+UV_PUBLISH_TOKEN="$PYPI_TOKEN" $UV_CMD publish "$@"
 
 echo ""
 echo "✓ Published atr-adaptive-laguerre==$VERSION"
