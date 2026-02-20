@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v2.4.1). Must already exist on GitHub.'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # For workflow_dispatch: checkout the specified tag; for push: use default
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5

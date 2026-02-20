@@ -23,5 +23,5 @@ plugins:
     - assets:
         - pyproject.toml
         - CHANGELOG.md
-      message: "chore(release): ${nextRelease.version} [skip ci]\n\nSRED-Type: support-work\nSRED-Claim: ATR-ADAPTIVE-LAGUERRE"
+      message: "chore(release): ${nextRelease.version}\n\nSRED-Type: support-work\nSRED-Claim: ATR-ADAPTIVE-LAGUERRE"
   - "@semantic-release/github"
