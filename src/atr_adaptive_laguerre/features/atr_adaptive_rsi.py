@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 from pydantic import Field, field_validator
 
+from atr_adaptive_laguerre.core._numba_kernel import _core_loop_numba
 from atr_adaptive_laguerre.core.adaptive import (
     calculate_adaptive_coefficient,
     calculate_adaptive_period,
@@ -407,15 +408,10 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         Returns:
             Tuple of (rsi_values array, IntermediateValues with all intermediates).
         """
-        high = df["high"].values
-        low = df["low"].values
-        close = df["close"].values
+        high = np.ascontiguousarray(df["high"].values, dtype=np.float64)
+        low = np.ascontiguousarray(df["low"].values, dtype=np.float64)
+        close = np.ascontiguousarray(df["close"].values, dtype=np.float64)
         n = len(df)
-
-        # Initialize stateful calculators
-        tr_state = TrueRangeState()
-        atr_state = ATRState(period=self.config.atr_period)
-        laguerre_state = LaguerreFilterState()
 
         # Pre-allocate output and intermediate arrays
         rsi_values = np.zeros(n, dtype=np.float64)
@@ -429,43 +425,16 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         max_atr_arr = np.zeros(n, dtype=np.float64)
         atr_arr = np.zeros(n, dtype=np.float64)
 
-        # Main calculation loop (matches MQL5 lines 232-295)
-        for i in range(n):
-            # Step 1: Calculate True Range (matches lines 239-242)
-            tr = tr_state.update(high[i], low[i], close[i])
-
-            # Step 2: Update ATR state (matches lines 244-287)
-            atr, min_atr, max_atr = atr_state.update(tr)
-
-            # Step 3: Calculate adaptive coefficient (matches lines 290-292)
-            adaptive_coeff = calculate_adaptive_coefficient(atr, min_atr, max_atr)
-
-            # Step 4: Calculate adaptive period (matches line 295)
-            adaptive_period = calculate_adaptive_period(
-                base_period=float(self.config.atr_period),
-                coefficient=adaptive_coeff,
-                offset=self.config.adaptive_offset,
-            )
-
-            # Step 5: Calculate Laguerre gamma (matches line 403)
-            gamma = calculate_gamma(adaptive_period)
-
-            # Step 6: Update Laguerre filter (matches lines 406-412)
-            L0, L1, L2, L3 = laguerre_state.update(close[i], gamma)
-
-            # Step 7: Calculate Laguerre RSI (matches lines 415-428)
-            rsi_values[i] = calculate_laguerre_rsi(L0, L1, L2, L3)
-
-            # Capture intermediate values
-            adaptive_coeff_arr[i] = adaptive_coeff
-            gamma_arr[i] = gamma
-            L0_arr[i] = L0
-            L1_arr[i] = L1
-            L2_arr[i] = L2
-            L3_arr[i] = L3
-            min_atr_arr[i] = min_atr
-            max_atr_arr[i] = max_atr
-            atr_arr[i] = atr
+        # JIT-compiled core loop (matches MQL5 lines 232-295)
+        _core_loop_numba(
+            high, low, close,
+            self.config.atr_period,
+            float(self.config.atr_period),
+            self.config.adaptive_offset,
+            rsi_values, adaptive_coeff_arr, gamma_arr,
+            L0_arr, L1_arr, L2_arr, L3_arr,
+            min_atr_arr, max_atr_arr, atr_arr,
+        )
 
         intermediates = IntermediateValues(
             adaptive_coeff=adaptive_coeff_arr,
