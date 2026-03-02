@@ -1,3 +1,11 @@
+## [2.5.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.5.0...v2.5.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* **release:** commit +x on pypi task and publish script ([68b4fee](https://github.com/terrylica/atr-adaptive-laguerre/commit/68b4fee0c6cf53897acb03a0eb680ce47ac17a3f))
+* **release:** harden pipeline for autonomous execution ([962d590](https://github.com/terrylica/atr-adaptive-laguerre/commit/962d590db2e5bb393f93d434afcd8aed4329769a))
+
 # [2.5.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.4.1...v2.5.0) (2026-03-02)
 
 
