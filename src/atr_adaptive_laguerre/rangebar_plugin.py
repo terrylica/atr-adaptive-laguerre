@@ -85,8 +85,13 @@ class LaguerreFeatureProvider:
     """
 
     def __init__(self, config: ATRAdaptiveLaguerreRSIConfig | None = None):
+        import warnings
+
         self._config = config or _load_config_from_env() or DEFAULT_CONFIG
-        self._indicator = ATRAdaptiveLaguerreRSI(self._config)
+        # Single-interval mode is intentional for per-bar enrichment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Using single-interval mode")
+            self._indicator = ATRAdaptiveLaguerreRSI(self._config)
 
     @property
     def name(self) -> str:
