@@ -11,8 +11,21 @@ echo ""
 # Phase 1: Preflight
 mise run release:preflight
 
+# Capture version BEFORE semantic-release
+VERSION_BEFORE=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
 # Phase 2: Version (semantic-release: bump pyproject.toml, CHANGELOG, git tag, GitHub release)
 mise run release:version
+
+# Detect "no new release" — if semantic-release published nothing, abort cleanly
+VERSION_AFTER=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+if [[ "$VERSION_BEFORE" == "$VERSION_AFTER" ]]; then
+    echo ""
+    echo "  ⚠ semantic-release did not create a new version."
+    echo "    No releasable conventional commits found."
+    echo "    Aborting (nothing to sync/publish)."
+    exit 0
+fi
 
 # Phase 3: Sync (uv build + push tag + push main)
 mise run release:sync

@@ -35,7 +35,7 @@ if [[ -z "$(echo "$GH_TOKEN" | tr -d '[:space:]')" ]]; then
     echo "  ✗ GH_TOKEN is empty"
     exit 1
 fi
-if [[ ! "$GH_TOKEN" =~ ^(ghp_|github_pat_) ]]; then
+if [[ ! "$GH_TOKEN" =~ ^(ghp_|gho_|github_pat_) ]]; then
     echo "  ⚠ GH_TOKEN format unusual (expected ghp_* or github_pat_*)"
 fi
 echo "  ✓ GH_TOKEN present (${#GH_TOKEN} chars)"
@@ -56,7 +56,7 @@ fi
 
 # Check 5: Tests pass
 echo "→ Running tests..."
-if uv run --python 3.13 pytest -q --no-header --tb=line --ignore=tests/test_temporal/test_properties.py 2>/dev/null; then
+if uv run --python 3.13 pytest -q --no-header --tb=line --ignore=tests/test_temporal/test_properties.py; then
     echo "  ✓ Tests pass"
 else
     echo "  ✗ Tests failed"

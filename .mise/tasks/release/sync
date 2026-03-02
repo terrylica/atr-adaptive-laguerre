@@ -26,13 +26,29 @@ else
 fi
 
 # Step 3: Push tag and main branch (creates GitHub release via semantic-release's @semantic-release/github)
-echo "→ Pushing tag v$VERSION and main..."
-if git rev-parse "v$VERSION" &>/dev/null; then
-    git push origin "v$VERSION" 2>/dev/null || echo "  ⚠ Tag already pushed"
-    git push origin main 2>/dev/null || echo "  ⚠ main already up to date"
+if ! git rev-parse "v$VERSION" &>/dev/null; then
+    echo "  ⚠ Tag v$VERSION not found — run release:version first"
+    exit 1
+fi
+
+echo "→ Pushing tag v$VERSION..."
+if git push origin "v$VERSION" 2>&1; then
     echo "  ✓ Tag v$VERSION pushed"
 else
-    echo "  ⚠ Tag v$VERSION not found — run release:version first"
+    # Distinguish "already on remote" from real failures
+    if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q "v$VERSION"; then
+        echo "  ✓ Tag v$VERSION already on remote"
+    else
+        echo "  ✗ Failed to push tag v$VERSION"
+        exit 1
+    fi
+fi
+
+echo "→ Pushing main..."
+if git push origin main 2>&1; then
+    echo "  ✓ main pushed"
+else
+    echo "  ✗ Failed to push main"
     exit 1
 fi
 
