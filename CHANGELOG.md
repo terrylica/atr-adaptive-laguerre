@@ -1,3 +1,18 @@
+# [2.5.0](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.4.1...v2.5.0) (2026-03-02)
+
+
+### Bug Fixes
+
+* **ci:** add workflow_dispatch to publish.yml + remove [skip ci] from release commit ([6bf8c3f](https://github.com/terrylica/atr-adaptive-laguerre/commit/6bf8c3fe1d6c2ef7ec2d9ef13f58103c072454df))
+* **deps:** bump laguerre dep to >=2.4.1 now that PyPI is updated ([215d6aa](https://github.com/terrylica/atr-adaptive-laguerre/commit/215d6aa6b9698dbe6728028311420245f7031a2f)), closes [#99](https://github.com/terrylica/atr-adaptive-laguerre/issues/99) [#99](https://github.com/terrylica/atr-adaptive-laguerre/issues/99)
+* **release:** fix publish-to-pypi.sh — ATR_OP_PYPI_ITEM var name, bash 3.2 compat, vault ID ([4805f0d](https://github.com/terrylica/atr-adaptive-laguerre/commit/4805f0db1fce612a3d5564b6bba307b2c49bc91b))
+* Suppress single-interval mode warning in rangebar plugin ([28d4585](https://github.com/terrylica/atr-adaptive-laguerre/commit/28d4585688ebe8905df5ad91f8eccfbcc0a95aaf))
+
+
+### Features
+
+* **perf:** Add numba [@njit](https://github.com/njit) core loop kernel for 20-80× speedup ([9b6cb88](https://github.com/terrylica/atr-adaptive-laguerre/commit/9b6cb881675094844ee7ae6e3ffc6ead83454897))
+
 ## [2.4.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.4.0...v2.4.1) (2026-02-19)
 
 
