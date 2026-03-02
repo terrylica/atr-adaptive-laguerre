@@ -616,7 +616,7 @@ BinanceAdapter(base_url: str = "https://api.binance.com")
 
 **Parameters**:
 
-- `base_url` (str, default="https://api.binance.com"): Binance API base URL
+- `base_url` (str, default="<https://api.binance.com>"): Binance API base URL
 
 #### Methods
 
@@ -792,7 +792,7 @@ df = append_new_bar(df, new_bar)
 rsi = feature.fit_transform(df)  # Refits entire window
 ```
 
-Future releases may add stateful incremental API for production use.
+For O(1) streaming updates, use `indicator.update(row)` or `indicator.update_full(row)`.
 
 ### Multi-Interval Lookahead
 
