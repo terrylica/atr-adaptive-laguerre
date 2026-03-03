@@ -1,3 +1,10 @@
+## [2.5.2](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.5.1...v2.5.2) (2026-03-03)
+
+
+### Performance Improvements
+
+* Tier-1 performance optimizations — 2-4x speedup ([2731ed6](https://github.com/terrylica/atr-adaptive-laguerre/commit/2731ed672e7e78ffe38b1f120a798bf920b2e44d)), closes [hi#impact](https://github.com/hi/issues/impact)
+
 ## [2.5.1](https://github.com/terrylica/atr-adaptive-laguerre/compare/v2.5.0...v2.5.1) (2026-03-02)
 
 
