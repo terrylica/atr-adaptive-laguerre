@@ -295,7 +295,7 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         self._tr_state: Optional[TrueRangeState] = None
         self._atr_state: Optional[ATRState] = None
         self._laguerre_state: Optional[LaguerreFilterState] = None
-        self._history: list = []  # Store recent bars for rolling statistics
+        # _history removed: was appended every update() but never read (memory leak)
 
     def fit_transform(self, df: pd.DataFrame) -> pd.Series:
         """
@@ -366,7 +366,8 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
 
         date_col = self.config.date_column
         if date_col in df.columns:
-            timestamps = pd.to_datetime(df[date_col])
+            col = df[date_col]
+            timestamps = col if pd.api.types.is_datetime64_any_dtype(col) else pd.to_datetime(col)
             if not timestamps.is_monotonic_increasing:
                 raise ValueError(
                     f"DataFrame must be sorted chronologically (ascending {date_col})"
@@ -413,17 +414,17 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         close = np.ascontiguousarray(df["close"].values, dtype=np.float64)
         n = len(df)
 
-        # Pre-allocate output and intermediate arrays
-        rsi_values = np.zeros(n, dtype=np.float64)
-        adaptive_coeff_arr = np.zeros(n, dtype=np.float64)
-        gamma_arr = np.zeros(n, dtype=np.float64)
-        L0_arr = np.zeros(n, dtype=np.float64)
-        L1_arr = np.zeros(n, dtype=np.float64)
-        L2_arr = np.zeros(n, dtype=np.float64)
-        L3_arr = np.zeros(n, dtype=np.float64)
-        min_atr_arr = np.zeros(n, dtype=np.float64)
-        max_atr_arr = np.zeros(n, dtype=np.float64)
-        atr_arr = np.zeros(n, dtype=np.float64)
+        # Pre-allocate output and intermediate arrays (empty: kernel writes every index)
+        rsi_values = np.empty(n, dtype=np.float64)
+        adaptive_coeff_arr = np.empty(n, dtype=np.float64)
+        gamma_arr = np.empty(n, dtype=np.float64)
+        L0_arr = np.empty(n, dtype=np.float64)
+        L1_arr = np.empty(n, dtype=np.float64)
+        L2_arr = np.empty(n, dtype=np.float64)
+        L3_arr = np.empty(n, dtype=np.float64)
+        min_atr_arr = np.empty(n, dtype=np.float64)
+        max_atr_arr = np.empty(n, dtype=np.float64)
+        atr_arr = np.empty(n, dtype=np.float64)
 
         # JIT-compiled core loop (matches MQL5 lines 232-295)
         _core_loop_numba(
@@ -614,9 +615,6 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         # Step 7: Calculate Laguerre RSI
         rsi = calculate_laguerre_rsi(L0, L1, L2, L3)
 
-        # Store in history for potential rolling statistics
-        self._history.append(ohlcv_row)
-
         return rsi
 
     def update_full(self, ohlcv_row: dict) -> tuple[float, dict]:
@@ -661,8 +659,6 @@ class ATRAdaptiveLaguerreRSI(BaseFeature):
         gamma = calculate_gamma(adaptive_period)
         L0, L1, L2, L3 = self._laguerre_state.update(close, gamma)
         rsi = calculate_laguerre_rsi(L0, L1, L2, L3)
-
-        self._history.append(ohlcv_row)
 
         intermediates_dict = {
             "adaptive_coeff": adaptive_coeff,

@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import pandas as pd
 
+from atr_adaptive_laguerre.core._numba_kernel import _rolling_percentile_numba
+
 if TYPE_CHECKING:
     from atr_adaptive_laguerre.features.intermediates import IntermediateValues
 
@@ -357,10 +359,9 @@ class FeatureExpander:
         rsi_max = stats_df["max"]
 
         # Percentile rank (current value's position in rolling window)
-        rsi_percentile_20 = (
-            rsi.rolling(window=self.stats_window, min_periods=1)
-            .apply(lambda x: (x[-1] > x[:-1]).sum() / len(x) * 100, raw=True)
-            .fillna(50.0)  # First bar: median rank
+        rsi_percentile_20 = pd.Series(
+            _rolling_percentile_numba(rsi.values, self.stats_window),
+            index=rsi.index,
         )
 
         # Z-score (avoid division by zero)

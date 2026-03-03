@@ -164,3 +164,39 @@ def _core_loop_numba(
         out_min_atr[i] = min_atr
         out_max_atr[i] = max_atr
         out_atr[i] = atr
+
+
+@njit(cache=True)
+def _rolling_percentile_numba(values, window):
+    """Rolling percentile rank: % of values in window that current value exceeds.
+
+    Equivalent to::
+
+        pd.Series(values).rolling(window, min_periods=1)
+            .apply(lambda x: (x[-1] > x[:-1]).sum() / len(x) * 100, raw=True)
+            .fillna(50.0)
+
+    Parameters
+    ----------
+    values : float64[n]
+        Input array (e.g. RSI values).
+    window : int
+        Rolling window size.
+
+    Returns
+    -------
+    float64[n]
+        Percentile ranks in [0, 100].
+    """
+    n = len(values)
+    out = np.empty(n, dtype=np.float64)
+    for i in range(n):
+        start = max(0, i - window + 1)
+        count = i - start + 1
+        current = values[i]
+        gt_count = 0
+        for j in range(start, i):
+            if current > values[j]:
+                gt_count += 1
+        out[i] = gt_count / count * 100.0
+    return out
