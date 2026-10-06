@@ -71,11 +71,16 @@ echo ""
 # ---- Fetch PyPI token from 1Password ----------------------------------------
 echo "→ Fetching PyPI token from 1Password (vault: $ATR_OP_PYPI_VAULT)..."
 
-# Use service account token if available (headless), otherwise biometric
-_OP_SA_TOKEN_FILE="$HOME/.claude/.secrets/op-service-account-token"
-if [[ -f "$_OP_SA_TOKEN_FILE" ]]; then
-    export OP_SERVICE_ACCOUNT_TOKEN
-    OP_SERVICE_ACCOUNT_TOKEN="$(cat "$_OP_SA_TOKEN_FILE")"
+# Use the service account token if available (headless), otherwise biometric.
+# The token lives in the operator's self-custody vault (scope op-service-account, path
+# token); the old plaintext file ~/.claude/.secrets/op-service-account-token is retired and
+# deliberately NOT read. It reaches `op` only via OP_SERVICE_ACCOUNT_TOKEN, never argv.
+if [[ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]] && command -v vault >/dev/null 2>&1; then
+    _op_sa=""
+    if _op_sa="$(vault get op-service-account token 2>/dev/null)" && [[ -n "$_op_sa" ]]; then
+        export OP_SERVICE_ACCOUNT_TOKEN="$_op_sa"
+    fi
+    _op_sa=""
 fi
 PYPI_TOKEN=$($OP_CMD item get "$ATR_OP_PYPI_ITEM" \
     --vault "$ATR_OP_PYPI_VAULT" \
